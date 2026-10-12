@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import {
-  ArrowRight, BarChart3, Bell, Briefcase, Lightbulb, ShoppingBag, CalendarX2, Check, CheckCircle2, Clock, ExternalLink, FileSearch, FileStack,
+  ArrowRight, BarChart3, Bell, Briefcase, Lightbulb, CalendarX2, Check, CheckCircle2, Clock, FileSearch, FileStack,
   Fingerprint, Globe, KeyRound, Link2, Lock, MessageSquareText, PlayCircle, Scale, ScrollText, ShieldCheck, Sparkles,
   Timer, UserCheck, Users, Video, X, Calculator, Code2, GraduationCap, Headphones, HeartPulse, Megaphone, Store, Truck, Workflow,
 } from "lucide-react";
@@ -9,7 +9,7 @@ import { InterviewMock, ReportMock, ScreeningMock } from "@/components/marketing
 import { SiteHeader } from "@/components/marketing/site-header";
 import { AccessRequestForm } from "@/components/marketing/access-request-form";
 import Image from "next/image";
-import { DEMO_URL, UPWORK_URL } from "@/lib/marketing";
+import { DEMO_URL } from "@/lib/marketing";
 
 export const metadata: Metadata = {
   title: { absolute: "DeliberateHire AI · AI video interviews with evidence you can verify" },
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     "DeliberateHire AI runs personalized AI video interviews for every candidate and gives recruiters reports where every assessment links to the exact moment in the transcript and recording.",
   openGraph: {
     title: "DeliberateHire AI · AI video interviews with evidence you can verify",
-    description: "Interview every candidate. Review only the evidence. Powered by Deligence Technologies.",
+    description: "Interview every candidate. Review only the evidence.",
     type: "website",
   },
 };
@@ -358,7 +358,7 @@ export default function Home() {
             </div>
           </div>
           <div className="rounded-2xl border border-[#DCE4F0] bg-white p-8">
-            <Logo variant="full" height={64} />
+            <Logo height={32} />
             <ul className="mt-6 space-y-3 text-sm text-[#3D4D6A]">
               {ABOUT_POINTS.map(({ icon: Icon, text }) => (
                 <li key={text} className="flex items-center gap-3"><Icon className="size-5 text-[#0B5BD3]" />{text}</li>
@@ -386,29 +386,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Buy on Upwork */}
-      <section id="upwork" className="scroll-mt-20 bg-white py-24">
-        <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <div className="grid items-center gap-10 rounded-3xl border border-[#DCE4F0] bg-[#F8FAFD] p-8 sm:p-12 lg:grid-cols-[1.3fr_1fr]">
-            <div>
-              <Eyebrow>Available on Upwork</Eyebrow>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance sm:text-[2.4rem] sm:leading-[1.15]">Get your own DeliberateHire AI, customized for your team</h2>
-              <p className="mt-4 text-lg leading-relaxed text-[#4A5874]">You will get an AI-powered video interviewing and candidate evaluation platform, set up and tailored to your hiring process, and bought securely through Upwork.</p>
-              <ul className="mt-6 grid gap-3 text-base text-[#3D4D6A] sm:grid-cols-2">
-                {["AI video interviews and reports", "Public apply link with AI screening", "Your branding and interview templates", "Set up and customized for you"].map((t) => (
-                  <li key={t} className="flex gap-3"><Check className="mt-0.5 size-5 shrink-0 text-[#0B5BD3]" />{t}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="flex flex-col items-start gap-4 lg:items-center lg:text-center">
-              <span className="flex size-14 items-center justify-center rounded-2xl bg-[#E9F1FD] text-[#0B5BD3]"><ShoppingBag className="size-7" /></span>
-              <a href={UPWORK_URL} target="_blank" rel="noopener noreferrer" className={BLUE_BTN}>Buy on Upwork <ExternalLink className="size-4" /></a>
-              <p className="text-sm text-[#5A6A86]">Prefer to talk first? <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#0B5BD3] hover:underline">Book a demo</a></p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Contact */}
       <section id="contact" className="scroll-mt-20 py-24">
         <div className="mx-auto grid max-w-7xl gap-8 px-5 sm:px-8 lg:grid-cols-[1fr_1.1fr]">
@@ -420,7 +397,6 @@ export default function Home() {
               <p className="mt-5 text-lg leading-relaxed text-[#D6E6FF]">Book a 20-minute demo. We&apos;ll show the full flow, from apply link to evidence-backed report, and talk through pricing for your hiring volume.</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-[#0B4FB8] hover:bg-[#EAF2FF]">Book a demo <ArrowRight className="size-4" /></a>
-                <a href={UPWORK_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/40 px-6 py-3.5 text-base font-semibold text-white hover:bg-white/10">Buy on Upwork <ExternalLink className="size-4" /></a>
               </div>
               <div className="flex-1" />
               <p className="mt-8 text-sm text-[#BFD3F5]">Access is by approval. Request access with the form, or book a call, and we&apos;ll set up your workspace. Pricing: contact us.</p>
@@ -434,7 +410,7 @@ export default function Home() {
       <footer className="border-t border-[#E3EAF5] bg-white">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">
           <div className="space-y-4">
-            <Logo variant="full" height={52} />
+            <Logo height={28} />
             <p className="max-w-sm text-sm leading-relaxed text-[#5A6A86]">AI video interviews with evidence you can verify. Interview every candidate; review only the evidence.</p>
           </div>
           <div>
@@ -451,7 +427,6 @@ export default function Home() {
             <p className="text-sm font-semibold">Contact</p>
             <ul className="mt-4 space-y-2.5 text-sm text-[#5A6A86]">
               <li><a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="hover:text-[#0B5BD3]">Book a demo</a></li>
-              <li><a href={UPWORK_URL} target="_blank" rel="noopener noreferrer" className="hover:text-[#0B5BD3]">Buy on Upwork</a></li>
               <li><a href="#contact" className="hover:text-[#0B5BD3]">Request access</a></li>
             </ul>
           </div>

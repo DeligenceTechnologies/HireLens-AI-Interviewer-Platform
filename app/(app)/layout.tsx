@@ -3,7 +3,7 @@ import { ShieldCheck } from "lucide-react";
 import { requireAuth } from "@/lib/auth/session";
 import { can, roleLabel } from "@/lib/auth/permissions";
 import { aiIsLive } from "@/lib/env";
-import { Copyright, Logo, PoweredBy } from "@/components/layout/logo";
+import { Copyright, Logo } from "@/components/layout/logo";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
@@ -27,8 +27,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <p className="font-medium text-foreground truncate">{auth.orgName}</p>
           <p className="text-muted-foreground">{roleLabel[auth.role]}</p>
         </div>
-        <PoweredBy height={16} className="mt-3 self-center" />
-        <Copyright className="mt-1.5 text-center text-[10px] leading-tight" />
+        <Copyright className="mt-3 text-center text-[10px] leading-tight" />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur lg:px-8">

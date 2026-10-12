@@ -1,7 +1,5 @@
 # DeliberateHire AI — AI Interviewer Platform
 
-_Powered by Deligence Technologies._
-
 Recruiters create jobs, invite candidates to personalized AI video interviews, and review evidence-backed reports. Every assessment links to timestamped transcript moments and the recording.
 
 **Principle:** the LLM handles language (parsing, question wording, analysis, summaries). The application owns interview state, timing, limits, persistence, permissions and security (see `lib/interview/state-machine.ts`). No AI output ever produces a hire/reject decision.

@@ -64,7 +64,7 @@ export default async function ApplyPage(props: PageProps<"/apply/[slug]">) {
           <ApplyForm slug={slug} company={job.company_name} jobTitle={job.title} />
         </aside>
       </main>
-      <footer className="flex flex-col items-center gap-3 border-t py-8"><Logo variant="full" height={40} /><Copyright /></footer>
+      <footer className="flex flex-col items-center gap-3 border-t py-8"><Logo height={24} /><Copyright /></footer>
     </div>
   );
 }
