@@ -57,14 +57,15 @@ export async function resolveToken(token: string): Promise<InterviewCtx> {
   const [row] = await withSystem((tx) => tx<{
     id: string; organization_id: string; status: InterviewStatus; plan_status: string; interview_plan: unknown; state: unknown;
     started_at: Date | null; consent_given: boolean; token_expires_at: Date | null; candidate_name: string; job_title: string;
-    org_name: string; settings: unknown;
+    org_name: string; settings: unknown; org_status: string;
   }[]>`
     select i.id, i.organization_id, i.status, i.plan_status, i.interview_plan, i.state, i.started_at, i.consent_given, i.token_expires_at,
-      c.name as candidate_name, j.title as job_title, o.name as org_name, o.settings
+      c.name as candidate_name, j.title as job_title, o.name as org_name, o.settings, o.status as org_status
     from interviews i join candidates c on c.id = i.candidate_id join jobs j on j.id = i.job_id join organizations o on o.id = i.organization_id
     where i.secure_token_hash = ${hashToken(token)}`);
   if (!row) throw new ApiError(404, "This interview link is invalid or has been replaced by a newer link.");
   if (row.status === "cancelled") throw new ApiError(410, "This interview has been cancelled.");
+  if (row.org_status !== "active") throw new ApiError(403, "This interview isn't available right now. Please contact the recruiter.");
   const notStarted = !ACTIVE.includes(row.status) && !FINISHED.includes(row.status);
   if (notStarted && row.token_expires_at && row.token_expires_at.getTime() < Date.now()) {
     throw new ApiError(410, "This interview link has expired. Please contact the recruiter for a new link.");

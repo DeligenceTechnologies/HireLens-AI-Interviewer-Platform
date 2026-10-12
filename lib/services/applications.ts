@@ -60,7 +60,7 @@ export async function getPublicJob(slug: string): Promise<PublicJob | null> {
     select j.id, j.organization_id, j.title, j.description, j.location, j.employment_type, j.experience_min, j.experience_max,
       j.required_skills, j.preferred_skills, j.responsibilities, o.name as company_name
     from jobs j join organizations o on o.id = j.organization_id
-    where j.apply_slug = ${slug} and j.apply_enabled and j.status = 'active'`);
+    where j.apply_slug = ${slug} and j.apply_enabled and j.status = 'active' and o.status = 'active'`);
   return job ?? null;
 }
 

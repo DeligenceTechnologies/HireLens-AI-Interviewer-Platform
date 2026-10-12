@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { getAuth } from "@/lib/auth/session";
+import { getAuth, getSessionUser } from "@/lib/auth/session";
 import { LoginForm } from "@/components/auth/login-form";
 
 export const metadata = { title: "Sign in" };
 
 export default async function LoginPage() {
   if (await getAuth()) redirect("/dashboard");
+  if ((await getSessionUser())?.isPlatformAdmin) redirect("/admin");
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>

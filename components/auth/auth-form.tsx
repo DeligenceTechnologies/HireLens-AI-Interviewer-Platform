@@ -14,7 +14,7 @@ export function AuthForm({ fields, submitLabel, endpoint, extra, onSuccess }: {
   submitLabel: string;
   endpoint: string;
   extra?: Record<string, string | undefined>;
-  onSuccess: () => void;
+  onSuccess: (res: Record<string, unknown>) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,8 +31,8 @@ export function AuthForm({ fields, submitLabel, endpoint, extra, onSuccess }: {
         setFieldErrors({});
         const data = Object.fromEntries(new FormData(e.currentTarget).entries());
         try {
-          await api(endpoint, { body: { ...data, ...Object.fromEntries(Object.entries(extra ?? {}).filter(([, v]) => v)) } });
-          onSuccess();
+          const res = await api<Record<string, unknown>>(endpoint, { body: { ...data, ...Object.fromEntries(Object.entries(extra ?? {}).filter(([, v]) => v)) } });
+          onSuccess(res);
         } catch (err) {
           const e2 = err as ClientApiError;
           if (e2.issues?.length) setFieldErrors(Object.fromEntries(e2.issues.map((i) => [i.path, i.message])));

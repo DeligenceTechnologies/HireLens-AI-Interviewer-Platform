@@ -14,8 +14,8 @@ export function LoginForm() {
         { name: "email", label: "Work email", type: "email", autoComplete: "email", placeholder: "you@company.com" },
         { name: "password", label: "Password", type: "password", autoComplete: "current-password" },
       ]}
-      onSuccess={() => {
-        router.push(next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
+      onSuccess={(res) => {
+        router.push(next && next.startsWith("/") && !next.startsWith("//") ? next : typeof res.home === "string" ? res.home : "/dashboard");
         router.refresh();
       }}
     />

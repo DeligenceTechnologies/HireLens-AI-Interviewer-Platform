@@ -10,7 +10,8 @@
     "db:migrate": "tsx --env-file=.env.local scripts/migrate.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "admin:grant": "tsx --env-file=.env.local scripts/platform-admin.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

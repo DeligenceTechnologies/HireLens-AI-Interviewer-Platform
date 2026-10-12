@@ -10,6 +10,7 @@ import { generateToken, hashToken } from "@/lib/security/tokens";
 import type { StoredPlan, InterviewStatus } from "@/types/interview";
 import type { SectionEvaluation } from "@/lib/validation/ai-schemas";
 import { readSettings } from "./org-settings";
+import { assertQuotaAvailable } from "./quota";
 
 export type InterviewListRow = {
   id: string;
@@ -82,6 +83,7 @@ export async function createInterview(orgId: string, userId: string, input: { jo
     const active = await tx`select 1 from interviews where job_id = ${job.id} and candidate_id = ${cand.id}
       and status not in ('cancelled','expired','failed')`;
     if (active.length) throw new ApiError(409, "This candidate already has an interview for this job.");
+    await assertQuotaAvailable(tx, orgId);
 
     const templateId = input.templateId ?? job.interview_template_id
       ?? (await tx<{ id: string }[]>`select id from interview_templates where organization_id = ${orgId} order by is_default desc, created_at limit 1`)[0]?.id;
@@ -158,6 +160,7 @@ export async function rotateLink(orgId: string, userId: string, interviewId: str
   await withOrg(orgId, async (tx) => {
     const [{ settings }] = await tx<{ settings: unknown }[]>`select settings from organizations where id = ${orgId}`;
     const days = readSettings(settings).invite_expiry_days;
+    await assertQuotaAvailable(tx, orgId, interviewId);
     const [row] = await tx<{ status: string }[]>`
       update interviews set secure_token_hash = ${hashToken(token)}, token_expires_at = now() + make_interval(days => ${days}),
         status = case when status = 'expired' then 'invited'::interview_status else status end

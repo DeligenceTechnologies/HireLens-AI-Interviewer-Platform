@@ -10,7 +10,8 @@ const Schema = z.object({
 
 export const POST = route(async (req) => {
   const { email, password } = await body(req, Schema);
-  const { userId, orgId } = await authenticate(email, password);
+  const { userId, orgId, isPlatformAdmin } = await authenticate(email, password);
   await createSession(userId, orgId);
-  return { ok: true };
+  // Platform admins without a company of their own land in the admin area.
+  return { ok: true, home: !orgId && isPlatformAdmin ? "/admin" : "/dashboard" };
 }, { rateLimit: { key: "login", limit: 10, windowMs: 10 * 60_000 } });

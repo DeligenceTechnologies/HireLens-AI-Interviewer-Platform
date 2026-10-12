@@ -84,12 +84,15 @@ Recruiter UI (Next.js App Router, server components)      Candidate browser
 - **Consent.** Consent is stored with its timestamp and version. Retention policies are configurable, and candidates, recordings, transcripts and reports can each be deleted.
 - **Audit log.** It covers lifecycle events, questions, answers, follow-ups, evaluations, report views, evidence views and recording access.
 - **Logging.** Logs are structured, and secrets, resume text and transcripts are redacted.
+- **Platform admin.** The `/admin` area (companies, users, access requests, free-interview quotas, sign-up code) is only for accounts flagged as platform admins. The flag can only be set from the command line, every admin action is written to `platform_audit_logs`, and admins see counts but never candidate videos, transcripts or resumes.
 
 ## Scripts
 
 ```bash
 npm run dev          # start the dev server
 npm run db:migrate   # apply SQL migrations
+npm run admin:grant -- you@company.com            # make an existing account a platform admin
+npm run admin:grant -- you@company.com --revoke   # remove it
 npm run typecheck    # next typegen + tsc
 npm run lint
 npm test             # vitest (unit + RLS integration)

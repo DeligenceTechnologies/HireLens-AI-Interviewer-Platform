@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 import { requireAuth } from "@/lib/auth/session";
 import { can, roleLabel } from "@/lib/auth/permissions";
 import { aiIsLive } from "@/lib/env";
@@ -17,6 +18,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-sidebar px-3 py-4 lg:flex">
         <Link href="/dashboard" className="mb-6 px-2"><Logo height={24} /></Link>
         <SidebarNav hidden={hiddenNav} />
+        {auth.isPlatformAdmin && (
+          <Link href="/admin" className="mt-4 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-muted">
+            <ShieldCheck className="size-4" /> Platform admin
+          </Link>
+        )}
         <div className="mt-auto rounded-lg border bg-muted/40 p-3 text-xs">
           <p className="font-medium text-foreground truncate">{auth.orgName}</p>
           <p className="text-muted-foreground">{roleLabel[auth.role]}</p>

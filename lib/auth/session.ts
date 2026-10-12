@@ -1,6 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { withSystem } from "@/lib/database/db";
 import { generateToken, hashToken } from "@/lib/security/tokens";
@@ -18,6 +18,7 @@ export type AuthContext = {
   orgSlug: string;
   role: Role;
   sessionId: string;
+  isPlatformAdmin: boolean;
 };
 
 export class AuthError extends Error {
@@ -57,22 +58,24 @@ export const getAuth = cache(async (): Promise<AuthContext | null> => {
   const rows = await withSystem((tx) => tx<{
     session_id: string; user_id: string; email: string; name: string; org_id: string | null;
     org_name: string | null; org_slug: string | null; role: Role | null; expires_at: Date; last_seen_at: Date;
+    is_platform_admin: boolean; disabled_at: Date | null;
   }[]>`
     select s.id as session_id, u.id as user_id, u.email, u.name, o.id as org_id, o.name as org_name,
-           o.slug as org_slug, m.role, s.expires_at, s.last_seen_at
+           o.slug as org_slug, case when o.id is null then null else m.role end as role, s.expires_at, s.last_seen_at,
+           u.is_platform_admin, u.disabled_at
     from sessions s
     join users u on u.id = s.user_id
     left join organization_members m on m.user_id = u.id and m.organization_id = s.organization_id
-    left join organizations o on o.id = m.organization_id
+    left join organizations o on o.id = m.organization_id and o.status = 'active'
     where s.token_hash = ${hashToken(token)}`);
   const row = rows[0];
-  if (!row || row.expires_at.getTime() < Date.now()) return null;
+  if (!row || row.expires_at.getTime() < Date.now() || row.disabled_at) return null;
   if (!row.org_id || !row.role) {
-    // Session points at an org the user is no longer a member of: fall back to any membership.
+    // Session points at an org the user left (or that was suspended): fall back to another active membership.
     const m = await withSystem((tx) => tx<{ org_id: string; org_name: string; org_slug: string; role: Role }[]>`
       select o.id as org_id, o.name as org_name, o.slug as org_slug, m.role
       from organization_members m join organizations o on o.id = m.organization_id
-      where m.user_id = ${row.user_id} order by m.created_at limit 1`);
+      where m.user_id = ${row.user_id} and o.status = 'active' order by m.created_at limit 1`);
     if (!m[0]) return null;
     await withSystem((tx) => tx`update sessions set organization_id = ${m[0].org_id} where id = ${row.session_id}`);
     Object.assign(row, m[0]);
@@ -89,8 +92,42 @@ export const getAuth = cache(async (): Promise<AuthContext | null> => {
     orgSlug: row.org_slug!,
     role: row.role!,
     sessionId: row.session_id,
+    isPlatformAdmin: row.is_platform_admin,
   };
 });
+
+export type SessionUser = { userId: string; email: string; name: string; isPlatformAdmin: boolean; hasCompany: boolean };
+
+/** The signed-in person, whether or not they belong to an active company (platform admins may not). */
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const [row] = await withSystem((tx) => tx<{ user_id: string; email: string; name: string; is_platform_admin: boolean; has_company: boolean }[]>`
+    select u.id as user_id, u.email, u.name, u.is_platform_admin,
+      exists (select 1 from organization_members m join organizations o on o.id = m.organization_id
+              where m.user_id = u.id and o.status = 'active') as has_company
+    from sessions s join users u on u.id = s.user_id
+    where s.token_hash = ${hashToken(token)} and s.expires_at > now() and u.disabled_at is null`);
+  if (!row) return null;
+  return { userId: row.user_id, email: row.email, name: row.name, isPlatformAdmin: row.is_platform_admin, hasCompany: row.has_company };
+});
+
+/** For admin pages: only platform admins; everyone else gets a 404. */
+export async function requirePlatformAdmin(): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) redirect("/login?next=/admin");
+  if (!user.isPlatformAdmin) notFound();
+  return user;
+}
+
+/** For admin route handlers. */
+export async function requirePlatformAdminApi(): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) throw new AuthError(401, "Not signed in");
+  if (!user.isPlatformAdmin) throw new AuthError(403, "You don't have permission to do that");
+  return user;
+}
 
 /** For server components/pages: redirect to login when signed out. */
 export async function requireAuth(permission?: Permission): Promise<AuthContext> {

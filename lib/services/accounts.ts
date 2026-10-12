@@ -9,13 +9,15 @@ import { hashPassword, verifyPassword } from "@/lib/security/password";
 import { generateToken, hashToken } from "@/lib/security/tokens";
 import type { Role } from "@/lib/auth/permissions";
 import { OrgSettingsSchema } from "./org-settings";
+import { getDefaultQuota } from "./platform";
 import { insertTemplate } from "./templates";
 
 function slugify(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "org";
 }
 
-export async function signup(input: { name: string; email: string; password: string; orgName?: string; inviteToken?: string }) {
+export async function signup(input: { name: string; email: string; password: string; orgName?: string; inviteToken?: string; companyInviteToken?: string }) {
+  const defaultQuota = await getDefaultQuota();
   const passwordHash = await hashPassword(input.password);
   return withSystem(async (tx) => {
     const existing = await tx`select 1 from users where email = ${input.email}`;
@@ -36,10 +38,23 @@ export async function signup(input: { name: string; email: string; password: str
       return { userId: user.id, orgId: invite.organization_id };
     }
 
-    const orgName = input.orgName?.trim() || `${input.name.split(" ")[0]}'s Team`;
+    // A one-time company link (from an approved access request) fixes the company name and quota.
+    let companyInvite: { id: string; company_name: string; email: string; interview_quota: number | null } | undefined;
+    if (input.companyInviteToken) {
+      [companyInvite] = await tx<{ id: string; company_name: string; email: string; interview_quota: number | null }[]>`
+        select id, company_name, email, interview_quota from company_invites
+        where token_hash = ${hashToken(input.companyInviteToken)} and used_at is null and revoked_at is null and expires_at > now()
+        for update`;
+      if (!companyInvite) throw new ApiError(400, "This sign-up link is invalid or has expired. Please contact us for a new one.");
+      if (companyInvite.email.toLowerCase() !== input.email.toLowerCase()) throw new ApiError(400, "Please sign up with the email address this link was created for.");
+    }
+    const orgName = companyInvite?.company_name ?? (input.orgName?.trim() || `${input.name.split(" ")[0]}'s Team`);
+    const quota = companyInvite ? companyInvite.interview_quota : defaultQuota;
     const slug = `${slugify(orgName)}-${generateToken(6).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5)}`;
     const [org] = await tx<{ id: string }[]>`
-      insert into organizations (name, slug, settings) values (${orgName}, ${slug}, ${json(OrgSettingsSchema.parse({}))}) returning id`;
+      insert into organizations (name, slug, settings, interview_quota, quota_counted_from)
+      values (${orgName}, ${slug}, ${json(OrgSettingsSchema.parse({}))}, ${quota}, now()) returning id`;
+    if (companyInvite) await tx`update company_invites set used_at = now(), organization_id = ${org.id} where id = ${companyInvite.id}`;
     await tx`insert into organization_members (organization_id, user_id, role) values (${org.id}, ${user.id}, 'owner')`;
     for (const [i, t] of DEFAULT_TEMPLATES.entries()) await insertTemplate(tx, org.id, user.id, t, i === 0);
     await audit(tx, { orgId: org.id, userId: user.id, action: "auth.signup", entityType: "organization", entityId: org.id });
@@ -50,15 +65,21 @@ export async function signup(input: { name: string; email: string; password: str
 const DUMMY_HASH = "scrypt$16384$AAAAAAAAAAAAAAAAAAAAAA==$" + Buffer.alloc(64).toString("base64");
 
 export async function authenticate(email: string, password: string) {
-  const [user] = await withSystem((tx) => tx<{ id: string; password_hash: string }[]>`
-    select id, password_hash from users where email = ${email}`);
+  const [user] = await withSystem((tx) => tx<{ id: string; password_hash: string; is_platform_admin: boolean; disabled_at: Date | null }[]>`
+    select id, password_hash, is_platform_admin, disabled_at from users where email = ${email}`);
   // Always run a hash comparison to keep response timing uniform.
   const ok = await verifyPassword(password, user?.password_hash ?? DUMMY_HASH);
   if (!user || !ok) throw new ApiError(401, "Incorrect email or password.");
-  const [m] = await withSystem((tx) => tx<{ organization_id: string }[]>`
-    select organization_id from organization_members where user_id = ${user.id} order by created_at limit 1`);
+  if (user.disabled_at) throw new ApiError(403, "This account has been disabled. Please contact support.");
+  const memberships = await withSystem((tx) => tx<{ organization_id: string; status: string }[]>`
+    select m.organization_id, o.status from organization_members m join organizations o on o.id = m.organization_id
+    where m.user_id = ${user.id} order by m.created_at`);
+  const m = memberships.find((x) => x.status === "active");
+  if (!m && memberships.length && !user.is_platform_admin) {
+    throw new ApiError(403, "This company account is suspended. Please contact support.");
+  }
   if (m) await withOrg(m.organization_id, (tx) => audit(tx, { orgId: m.organization_id, userId: user.id, action: "auth.login", entityType: "user", entityId: user.id }));
-  return { userId: user.id, orgId: m?.organization_id ?? null };
+  return { userId: user.id, orgId: m?.organization_id ?? null, isPlatformAdmin: user.is_platform_admin };
 }
 
 export async function requestPasswordReset(email: string) {
