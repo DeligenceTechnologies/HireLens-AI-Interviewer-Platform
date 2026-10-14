@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import {
   ArrowRight, BarChart3, Bell, Briefcase, Lightbulb, CalendarX2, Check, CheckCircle2, Clock, FileSearch, FileStack,
@@ -7,6 +8,7 @@ import {
 import { Copyright, Logo } from "@/components/layout/logo";
 import { InterviewMock, ReportMock, ScreeningMock } from "@/components/marketing/mocks";
 import { SiteHeader } from "@/components/marketing/site-header";
+import { DemoVideo } from "@/components/marketing/demo-video";
 import { AccessRequestForm } from "@/components/marketing/access-request-form";
 import Image from "next/image";
 import { DEMO_URL } from "@/lib/marketing";
@@ -178,6 +180,15 @@ export default function Home() {
               <p className="mx-auto mt-2 max-w-[16rem] text-sm leading-snug text-[#4A5874]">{l}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Product demo */}
+      <section id="demo" className="scroll-mt-20 py-24">
+        <div className="mx-auto max-w-5xl px-5 sm:px-8">
+          <SectionHead center eyebrow="Product demo" title="See DeliberateHire AI in action" intro="A 10-minute walkthrough with a live AI interview: create a job, screen applicants, interview a candidate, and review the evidence-backed report." />
+          <DemoVideo className="mt-12" />
+          <p className="mt-4 text-center text-sm text-[#7A8AA6]">Recorded with sample data. <Link href="/demo" className="font-medium text-[#0B5BD3] hover:underline">Open the demo page</Link></p>
         </div>
       </section>
 

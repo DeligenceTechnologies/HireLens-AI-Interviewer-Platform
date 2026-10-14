@@ -8,12 +8,13 @@ import { DEMO_URL } from "@/lib/marketing";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "#how-it-works", label: "How it works" },
-  { href: "#features", label: "Features" },
-  { href: "#team", label: "For teams" },
-  { href: "#why", label: "Why us" },
-  { href: "#trust", label: "Trust" },
-  { href: "#faq", label: "FAQ" },
+  { href: "/#demo", label: "Demo" },
+  { href: "/#how-it-works", label: "How it works" },
+  { href: "/#features", label: "Features" },
+  { href: "/#team", label: "For teams" },
+  { href: "/#why", label: "Why us" },
+  { href: "/#trust", label: "Trust" },
+  { href: "/#faq", label: "FAQ" },
 ];
 
 export function SiteHeader() {
@@ -28,7 +29,7 @@ export function SiteHeader() {
           {NAV.map((n) => <a key={n.href} href={n.href} className="hover:text-[#0B5BD3]">{n.label}</a>)}
         </nav>
         <div className="ml-auto flex items-center gap-2 lg:ml-0">
-          <a href="#contact" className="hidden rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap text-[#0F1F3A] hover:bg-[#E9F0FB] sm:inline-flex">Contact us</a>
+          <Link href="/#contact" className="hidden rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap text-[#0F1F3A] hover:bg-[#E9F0FB] sm:inline-flex">Contact us</Link>
           <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="inline-flex rounded-lg bg-[#0B5BD3] px-4 py-2 text-sm font-semibold whitespace-nowrap text-white shadow-sm hover:bg-[#0A4FB8]">
             Book a demo
           </a>
