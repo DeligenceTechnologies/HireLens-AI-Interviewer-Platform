@@ -18,6 +18,8 @@ export async function createRealtimeCredentials(input: {
   interviewerName: string;
   companyName: string;
   jobTitle: string;
+  /** Context for speech-to-text (role, company, candidate, likely terms). */
+  transcriptionPrompt?: string;
 }): Promise<RealtimeCredentials> {
   if (!aiIsLive()) return { mode: "mock" };
   const started = Date.now();
@@ -30,7 +32,7 @@ export async function createRealtimeCredentials(input: {
         instructions: buildInstructions(input),
         audio: {
           input: {
-            transcription: { model: AI_CONFIG.transcription, language: "en" },
+            transcription: { model: AI_CONFIG.transcription, language: "en", ...(input.transcriptionPrompt ? { prompt: input.transcriptionPrompt } : {}) },
             noise_reduction: { type: "near_field" },
             turn_detection: {
               type: "semantic_vad",

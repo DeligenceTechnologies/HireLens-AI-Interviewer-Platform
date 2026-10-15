@@ -7,6 +7,7 @@ import { json, withOrg, withSystem, type Tx } from "@/lib/database/db";
 import { audit, notify } from "@/lib/audit";
 import { ApiError } from "@/lib/api";
 import { analyzeAnswer } from "@/lib/ai/answer-analyzer";
+import { buildTranscriptionPrompt } from "@/prompts/transcription/v1";
 import { analyzeTurn } from "@/lib/ai/answer-turn";
 import { mockAnalyzeAnswer } from "@/lib/ai/mock";
 import { createRealtimeCredentials, type RealtimeCredentials } from "@/lib/ai/realtime-session";
@@ -261,7 +262,18 @@ function stripIntro(text: string) {
 export async function getRealtimeCredentials(token: string): Promise<RealtimeCredentials> {
   const ctx = await resolveToken(token);
   if (!ACTIVE.includes(ctx.status) && !["ready", "device_check"].includes(ctx.status)) throw new ApiError(409, "The interview is not active.");
-  return createRealtimeCredentials({ orgId: ctx.orgId, interviewerName: ctx.interviewerName, companyName: ctx.companyName, jobTitle: ctx.jobTitle });
+  // Names and terms from the job and the parsed resume help speech-to-text spell them correctly.
+  const [ref] = await withOrg(ctx.orgId, (tx) => tx<{ required_skills: string[]; preferred_skills: string[]; profile: { skills?: string[]; companies?: string[]; projects?: { name?: string }[] } | null }[]>`
+    select j.required_skills, j.preferred_skills, c.parsed_profile as profile
+    from interviews i join jobs j on j.id = i.job_id join candidates c on c.id = i.candidate_id where i.id = ${ctx.id}`);
+  const terms = [
+    ...(ref?.profile?.companies ?? []), ...(ref?.profile?.projects ?? []).map((p) => p.name ?? ""),
+    ...(ref?.required_skills ?? []), ...(ref?.preferred_skills ?? []), ...(ref?.profile?.skills ?? []),
+  ].filter((t): t is string => typeof t === "string");
+  return createRealtimeCredentials({
+    orgId: ctx.orgId, interviewerName: ctx.interviewerName, companyName: ctx.companyName, jobTitle: ctx.jobTitle,
+    transcriptionPrompt: buildTranscriptionPrompt({ jobTitle: ctx.jobTitle, companyName: ctx.companyName, candidateName: ctx.candidateName, terms }),
+  });
 }
 
 export async function getSessionState(token: string): Promise<SessionPayload> {

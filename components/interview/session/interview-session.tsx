@@ -71,6 +71,7 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
   const [countdown, setCountdown] = useState<{ kind: "silence" | "no_answer"; seconds: number } | null>(null);
   const [nudged, setNudged] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
+  const [saving, setSaving] = useState(false);
 
   const video = useRef<HTMLVideoElement>(null);
   const camera = useRef<MediaStream | null>(null);
@@ -91,6 +92,7 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
   const nudgedRef = useRef(false);
   const ackIndex = useRef(0);
   const finishing = useRef(false);
+  const submitting = useRef(false);
   const events = useRef<{ event_id: string; type: string; payload?: Record<string, string | number | boolean | null> }[]>([]);
 
   const clock = useCallback(() => {
@@ -146,6 +148,8 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
     nudgedRef.current = false;
     setNudged(false);
     setCountdown(null);
+    submitting.current = false;
+    setSaving(false);
   };
 
   const finish = useCallback(async (reason: "finished" | "candidate_ended" | "time_limit") => {
@@ -188,8 +192,14 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
 
   const submit = useCallback(async (trigger: Trigger) => {
     const u = current.current;
-    if (!u?.question_id || aiRef.current !== "listening") return;
+    if (!u?.question_id || aiRef.current !== "listening" || submitting.current) return;
+    submitting.current = true;
     setCountdown(null);
+    // Never drop speech: transcribe everything the candidate said before moving on.
+    setSaving(true);
+    await engine.current?.flush(10_000).catch(() => undefined);
+    setSaving(false);
+    if (current.current !== u || aiRef.current !== "listening") { submitting.current = false; return; }
     setAiState("thinking");
     engine.current?.stopListening();
     const text = [...parts.current, typedRef.current.trim()].filter(Boolean).join(" ").trim();
@@ -228,7 +238,7 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
   useEffect(() => {
     if (ai !== "listening") return;
     const tick = setInterval(() => {
-      if (aiRef.current !== "listening" || speakingNow.current || pending.current > 0) {
+      if (aiRef.current !== "listening" || submitting.current || speakingNow.current || pending.current > 0) {
         setCountdown(null);
         return;
       }
@@ -267,7 +277,7 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
   const [cbProxy] = useState<VoiceCallbacks>(() => ({
     onSpeechStart: () => callbacks.current!.onSpeechStart(),
     onSpeechStop: () => callbacks.current!.onSpeechStop(),
-    onTranscript: (t, i) => callbacks.current!.onTranscript(t, i),
+    onTranscript: (t, i, timing) => callbacks.current!.onTranscript(t, i, timing),
     onPendingChange: (n) => callbacks.current!.onPendingChange(n),
     onConnection: (s) => callbacks.current!.onConnection(s),
     onRemoteStream: (s) => callbacks.current!.onRemoteStream(s),
@@ -326,12 +336,15 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
       setCandidateSpeaking(false);
       lastActivityAt.current = Date.now();
     },
-    onTranscript: (text, itemId) => {
+    onTranscript: (text, itemId, timing) => {
       const u = current.current;
       parts.current.push(text);
       setHeard(parts.current.join(" "));
-      const start = lastSpeechStart.current ?? clock();
-      saveSegment({ client_event_id: `cand-${itemId}`, speaker: "candidate", text, start_ms: start, end_ms: Math.max(start, clock() - 400), question_id: u?.question_id ?? null });
+      // Timestamp the line where it was said (speech service timing), not when its transcript arrived.
+      const at = (epoch: number) => Math.max(0, clock() - (Date.now() - epoch));
+      const start = timing?.startedAt != null ? at(timing.startedAt) : (lastSpeechStart.current ?? clock());
+      const end = timing?.stoppedAt != null ? at(timing.stoppedAt) : clock() - 400;
+      saveSegment({ client_event_id: `cand-${itemId}`, speaker: "candidate", text, start_ms: start, end_ms: Math.max(start, end), question_id: u?.question_id ?? null });
       lastActivityAt.current = Date.now();
     },
     onPendingChange: (n) => { pending.current = n; if (n === 0) lastActivityAt.current = Date.now(); },
@@ -402,10 +415,7 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
   const doneAnswering = async () => {
     if (aiRef.current !== "listening") return;
     if (answerStart.current == null) answerStart.current = clock();
-    // Give in-flight transcriptions a moment to arrive (usually well under a second).
-    const deadline = Date.now() + 2500;
-    while (pending.current > 0 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
-    await submit("button");
+    await submit("button"); // submit() waits for every transcript first
   };
 
   const totalMs = (progress?.total_minutes ?? 0) * 60_000;
@@ -470,7 +480,7 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
             <p className="text-sm text-zinc-400" aria-live="polite">
               {ai === "connecting" && "Connecting…"}
               {ai === "speaking" && "Speaking"}
-              {ai === "listening" && (candidateSpeaking ? "Listening…" : "Your turn — answer when ready")}
+              {ai === "listening" && (saving ? "Saving your answer…" : candidateSpeaking ? "Listening…" : "Your turn — answer when ready")}
               {ai === "thinking" && "Thinking about your answer…"}
               {ai === "finishing" && "Wrapping up and saving your interview…"}
             </p>
@@ -529,7 +539,9 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
         <div className="ml-auto flex items-center gap-2">
           <Button variant="ghost" size="sm" className="text-zinc-300 hover:bg-white/10 hover:text-white" onClick={() => setCaptions(!captions)} aria-pressed={captions}><Captions /> Captions</Button>
           {!demoMode && <Button variant="ghost" size="sm" className="text-zinc-300 hover:bg-white/10 hover:text-white" onClick={() => setTyping(!typing)} aria-pressed={typing}><Keyboard /> Type</Button>}
-          <Button size="sm" disabled={!listening} onClick={doneAnswering} className="bg-indigo-500 text-white hover:bg-indigo-400">Done answering</Button>
+          <Button size="sm" disabled={!listening || saving} onClick={doneAnswering} className="bg-indigo-500 text-white hover:bg-indigo-400">
+            {saving && <Loader2 className="animate-spin" />}{saving ? "Saving answer…" : "Done answering"}
+          </Button>
           <ConfirmDialog
             title="End the interview now?"
             description="Your answers so far will be saved and sent to the hiring team. You won't be able to resume."
