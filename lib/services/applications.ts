@@ -12,7 +12,7 @@ import { generateToken } from "@/lib/security/tokens";
 import type { ApplicationScreening, JobRequirements, MatchLevel, ResumeProfile } from "@/lib/validation/ai-schemas";
 import { parseCandidateResume, storeResume } from "./candidates";
 import { detectResumeKind } from "./document-text";
-import { createInterview } from "./interviews";
+import { createInterview, type CreateInterviewInput } from "./interviews";
 
 export type ApplicationStatus = "new" | "shortlisted" | "interview_invited" | "declined";
 
@@ -211,11 +211,11 @@ export async function setApplicationStatus(orgId: string, userId: string, applic
 }
 
 /** Recruiter decision: invite the applicant to the AI interview for this job. */
-export async function inviteApplicant(orgId: string, userId: string, applicationId: string, sendInvite: boolean) {
+export async function inviteApplicant(orgId: string, userId: string, applicationId: string, sendInvite: boolean,
+  round: Omit<CreateInterviewInput, "jobId" | "candidateId" | "sendInvite"> = {}) {
   const app = await getApplication(orgId, applicationId);
   if (!app) throw new ApiError(404, "Application not found");
-  if (app.interview_id) throw new ApiError(409, "This applicant has already been invited.");
-  const { id, link } = await createInterview(orgId, userId, { jobId: app.job_id, candidateId: app.candidate_id, sendInvite });
+  const { id, link } = await createInterview(orgId, userId, { ...round, jobId: app.job_id, candidateId: app.candidate_id, sendInvite });
   await withOrg(orgId, async (tx) => {
     await tx`update job_applications set status = 'interview_invited', interview_id = ${id}, reviewed_by = ${userId}, reviewed_at = now() where id = ${applicationId}`;
     await audit(tx, { orgId, userId, action: "application.interview_invited", entityType: "application", entityId: applicationId, metadata: { interview_id: id } });

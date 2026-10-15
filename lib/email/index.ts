@@ -53,12 +53,12 @@ export async function sendEmail(msg: EmailMessage): Promise<{ ok: boolean }> {
 }
 
 export const emailTemplates = {
-  invitation(input: { candidateName: string; jobTitle: string; companyName: string; minutes: number; link: string; expiresAt: Date | null }) {
+  invitation(input: { candidateName: string; jobTitle: string; companyName: string; minutes: number; link: string; expiresAt: Date | null; roundName?: string | null }) {
     return {
-      subject: "Your AI interview invitation",
+      subject: input.roundName ? `Your ${input.roundName} interview for ${input.jobTitle}` : "Your AI interview invitation",
       text: `Hi ${input.candidateName},
 
-${input.companyName} has invited you to an AI-assisted interview for the ${input.jobTitle} role.
+${input.companyName} has invited you to ${input.roundName ? `the ${input.roundName} round, an AI-assisted interview,` : "an AI-assisted interview"} for the ${input.jobTitle} role.
 
 • Approximate duration: ${input.minutes} minutes
 • You'll need a computer with a camera and microphone, and a quiet place.
@@ -83,12 +83,12 @@ Our hiring team reviews every application. If your background is a match, we'll 
 ${input.companyName} hiring team`,
     };
   },
-  reminder(input: { candidateName: string; jobTitle: string; companyName: string; link: string }) {
+  reminder(input: { candidateName: string; jobTitle: string; companyName: string; link: string; roundName?: string | null }) {
     return {
-      subject: `Reminder: your interview for ${input.jobTitle}`,
+      subject: `Reminder: your ${input.roundName ? `${input.roundName} ` : ""}interview for ${input.jobTitle}`,
       text: `Hi ${input.candidateName},
 
-This is a friendly reminder that your AI interview for the ${input.jobTitle} role at ${input.companyName} is still waiting for you.
+This is a friendly reminder that your ${input.roundName ? `${input.roundName} ` : ""}AI interview for the ${input.jobTitle} role at ${input.companyName} is still waiting for you.
 
 Start when you're ready: ${input.link}
 

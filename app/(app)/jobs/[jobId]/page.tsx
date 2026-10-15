@@ -15,6 +15,7 @@ import { employmentTypeLabel, formatDate } from "@/lib/format";
 import { isUuid } from "@/lib/ids";
 import { listInterviews } from "@/lib/services/interviews";
 import { getJob } from "@/lib/services/jobs";
+import { listRounds } from "@/lib/services/rounds";
 import { applyUrl, listApplications } from "@/lib/services/applications";
 import { ApplyLinkCard } from "@/components/applications/apply-link-card";
 import { ApplicationsTable } from "@/components/applications/applications-table";
@@ -26,9 +27,10 @@ export default async function JobPage(props: PageProps<"/jobs/[jobId]">) {
   const job = await getJob(auth.orgId, jobId);
   if (!job) notFound();
   const canSeeCandidates = can(auth.role, "candidate:view");
-  const [interviews, applications] = await Promise.all([
+  const [interviews, applications, rounds] = await Promise.all([
     listInterviews(auth.orgId, { jobId }),
     canSeeCandidates ? listApplications(auth.orgId, jobId) : Promise.resolve([]),
+    listRounds(auth.orgId, jobId),
   ]);
   const screening = applications.some((a) => a.screening_status === "pending" || a.screening_status === "processing");
   const newCount = applications.filter((a) => a.status === "new").length;
@@ -69,7 +71,7 @@ export default async function JobPage(props: PageProps<"/jobs/[jobId]">) {
                 {can(auth.role, "interview:write") && job.status !== "closed" && <InviteDialog jobId={job.id} />}
               </div>
             </div>
-            {interviews.rows.length ? <InterviewTable rows={interviews.rows} hideJob /> : (
+            {interviews.rows.length ? <InterviewTable rows={interviews.rows} hideJob showRound /> : (
               <div className="p-5"><EmptyState icon={Users} title="No candidates invited yet" description="Invite a candidate — upload their resume and the AI will tailor the interview to their experience." /></div>
             )}
             {interviews.total > interviews.rows.length && (
@@ -111,10 +113,26 @@ export default async function JobPage(props: PageProps<"/jobs/[jobId]">) {
             ) : !parsing && <p className="text-sm text-muted-foreground">Add a job description to extract structured requirements.</p>}
           </section>
           <section className="rounded-xl border bg-card p-5">
-            <h2 className="mb-2 font-semibold">Interview template</h2>
-            {job.interview_template_id ? (
-              <Link href={`/templates/${job.interview_template_id}`} className="text-sm text-primary hover:underline">{job.template_name}</Link>
-            ) : <p className="text-sm text-muted-foreground">No template selected — the workspace default will be used.</p>}
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-semibold">Interview rounds</h2>
+              {can(auth.role, "job:write") && <Link href={`/jobs/${job.id}/edit`} className="text-xs text-primary hover:underline">Edit rounds</Link>}
+            </div>
+            {rounds.length ? (
+              <ol className="space-y-3">
+                {rounds.map((r, i) => (
+                  <li key={r.id} className="flex gap-3">
+                    <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">{i + 1}</span>
+                    <div className="min-w-0 text-sm">
+                      <p className="font-medium">{r.name}</p>
+                      {r.template_id
+                        ? <Link href={`/templates/${r.template_id}`} className="text-xs text-primary hover:underline">{r.template_name} · {r.minutes} min</Link>
+                        : <p className="text-xs text-destructive">No template: edit the job to choose one</p>}
+                      <p className="text-xs text-muted-foreground">{r.completed} completed · {r.interviews} invited</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : <p className="text-sm text-muted-foreground">No interview rounds yet. Edit the job to add one.</p>}
           </section>
         </div>
       </div>

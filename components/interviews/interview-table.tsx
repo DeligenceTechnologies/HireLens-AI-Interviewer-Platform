@@ -4,7 +4,12 @@ import { StatusBadge } from "@/components/common/status-badge";
 import { formatDuration, timeAgo } from "@/lib/format";
 import type { InterviewListRow } from "@/lib/services/interviews";
 
-export function InterviewTable({ rows, hideJob, hideCandidate }: { rows: InterviewListRow[]; hideJob?: boolean; hideCandidate?: boolean }) {
+/** "Screening", or "Screening · attempt 2" for a repeat. */
+export function roundLabel(r: { round_name: string | null; attempt: number }) {
+  return r.round_name ? `${r.round_name}${r.attempt > 1 ? ` · attempt ${r.attempt}` : ""}` : null;
+}
+
+export function InterviewTable({ rows, hideJob, hideCandidate, showRound }: { rows: InterviewListRow[]; hideJob?: boolean; hideCandidate?: boolean; showRound?: boolean }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -12,6 +17,7 @@ export function InterviewTable({ rows, hideJob, hideCandidate }: { rows: Intervi
           <tr>
             {!hideCandidate && <th className="px-4 py-2.5 font-medium">Candidate</th>}
             {!hideJob && <th className="px-4 py-2.5 font-medium">Job</th>}
+            {showRound && <th className="px-4 py-2.5 font-medium">Round</th>}
             <th className="px-4 py-2.5 font-medium">Status</th>
             <th className="px-4 py-2.5 font-medium">Duration</th>
             <th className="px-4 py-2.5 text-right font-medium">Last activity</th>
@@ -29,8 +35,10 @@ export function InterviewTable({ rows, hideJob, hideCandidate }: { rows: Intervi
               {!hideJob && (
                 <td className="px-4 py-3">
                   {hideCandidate ? <Link href={`/interviews/${r.id}`} className="font-medium after:absolute after:inset-0 group-hover:text-primary">{r.job_title}</Link> : r.job_title}
+                  {!showRound && roundLabel(r) && <p className="text-xs text-muted-foreground">{roundLabel(r)}</p>}
                 </td>
               )}
+              {showRound && <td className="px-4 py-3 text-muted-foreground">{roundLabel(r) ?? "—"}</td>}
               <td className="px-4 py-3">
                 <span className="flex items-center gap-2">
                   <StatusBadge status={r.status} />

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { body, route } from "@/lib/api";
 import { requireApiAuth } from "@/lib/auth/session";
 import { createInterview, listInterviews } from "@/lib/services/interviews";
+import { RoundChoiceSchema } from "@/lib/validation/rounds";
 
 export const GET = route(async (req) => {
   const auth = await requireApiAuth("interview:view");
@@ -14,10 +15,9 @@ export const GET = route(async (req) => {
   });
 });
 
-const Schema = z.object({
+const Schema = RoundChoiceSchema.extend({
   jobId: z.string().uuid(),
   candidateId: z.string().uuid(),
-  templateId: z.string().uuid().nullable().optional(),
   sendInvite: z.boolean().default(true),
 });
 

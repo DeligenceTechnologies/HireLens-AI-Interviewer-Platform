@@ -28,7 +28,7 @@ export async function getDashboard(orgId: string, opts: { includeCandidateData: 
       select j.id, j.title, case
         when exists (select 1 from job_applications a where a.job_id = j.id and a.status = 'new' and a.interview_id is null and a.screening_status = 'completed')
           then (select count(*) from job_applications a where a.job_id = j.id and a.status = 'new' and a.interview_id is null)::text || ' new application(s) to review'
-        when j.interview_template_id is null then 'No interview template selected'
+        when not exists (select 1 from job_rounds r where r.job_id = j.id and r.template_id is not null) then 'No interview rounds set up'
         when j.parse_status = 'failed' then 'Job description analysis failed'
         when not exists (select 1 from interviews i where i.job_id = j.id) then 'No candidates invited yet'
         when exists (select 1 from interviews i where i.job_id = j.id and i.status in ('completed') and i.processing_error is not null) then 'A report needs a retry'
@@ -200,18 +200,32 @@ export async function runRetention(orgId: string, userId: string | null) {
 }
 
 /** Candidate comparison for one job, using only recruiter-visible, job-relevant dimensions. */
-export async function getComparison(orgId: string, jobId: string) {
+export async function getComparison(orgId: string, jobId: string, roundName?: string | null) {
   return withOrg(orgId, async (tx) => {
-    const interviews = await tx<{ id: string; candidate_name: string; status: string; duration_seconds: number | null; completed_at: Date | null }[]>`
-      select i.id, c.name as candidate_name, i.status, i.duration_seconds, i.completed_at from interviews i join candidates c on c.id = i.candidate_id
-      where i.job_id = ${jobId} and i.organization_id = ${orgId} and i.status not in ('cancelled') order by c.name`;
+    // Interviews are compared within one round; rounds are listed by job order, then any one-off rounds.
+    const rounds = (await tx<{ name: string }[]>`
+      select name from (
+        select r.name, r.sort_order as o, 0 as k from job_rounds r where r.job_id = ${jobId}
+        union all
+        select distinct i.round_name, 1000, 1 from interviews i where i.job_id = ${jobId} and i.round_name is not null
+          and i.status <> 'cancelled' and not exists (select 1 from job_rounds r where r.job_id = ${jobId} and r.name = i.round_name)
+      ) x order by o, name`).map((r) => r.name).filter((n, i, a) => a.indexOf(n) === i);
+    const round = roundName && rounds.includes(roundName) ? roundName : rounds[0] ?? null;
+    const interviews = await tx<{ id: string; candidate_name: string; status: string; duration_seconds: number | null; completed_at: Date | null; attempt: number }[]>`
+      select i.id, c.name as candidate_name, i.status, i.duration_seconds, i.completed_at, i.attempt from interviews i join candidates c on c.id = i.candidate_id
+      where i.job_id = ${jobId} and i.organization_id = ${orgId} and i.status not in ('cancelled')
+        ${round ? tx`and i.round_name = ${round}` : tx``}
+      order by c.name, i.attempt`;
+    const ids = interviews.map((i) => i.id);
     const sections = await tx<{ interview_id: string; name: string; sort_order: number; status: string; assessment: string | null; score: number | null }[]>`
       select s.interview_id, s.name, s.sort_order, s.status, e.assessment, e.score from interview_sections s
       left join section_evaluations e on e.section_id = s.id
-      join interviews i on i.id = s.interview_id where i.job_id = ${jobId} and i.organization_id = ${orgId}`;
+      where s.interview_id = any(${ids})`;
     const names: string[] = [];
     for (const s of [...sections].sort((a, b) => a.sort_order - b.sort_order)) if (!names.includes(s.name)) names.push(s.name);
     return {
+      rounds,
+      round,
       columns: names,
       rows: interviews.map((iv) => ({
         ...iv,

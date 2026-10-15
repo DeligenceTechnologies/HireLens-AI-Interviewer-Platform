@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TagInput } from "@/components/common/tag-input";
 import { api, ClientApiError } from "@/lib/client/api";
+import { newRoundKey, type RoundValue, RoundsEditor } from "./rounds-editor";
 
 export type JobFormValue = {
   title: string;
@@ -21,17 +22,17 @@ export type JobFormValue = {
   required_skills: string[];
   preferred_skills: string[];
   responsibilities: string[];
-  interview_template_id: string | null;
+  rounds: RoundValue[];
   status: "draft" | "active" | "paused" | "closed";
 };
 
 const selectClass = "h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
-function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+function Section({ title, description, children, required }: { title: string; description: string; children: React.ReactNode; required?: boolean }) {
   return (
     <section className="grid gap-6 border-b py-8 first:pt-0 last:border-0 md:grid-cols-3">
       <div>
-        <h2 className="font-semibold">{title}</h2>
+        <h2 className="font-semibold">{title}{required && <span aria-hidden="true" className="ml-0.5 text-destructive">*</span>}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </div>
       <div className="space-y-4 md:col-span-2">{children}</div>
@@ -44,7 +45,7 @@ export function JobForm({ initial, jobId, templates }: { initial?: JobFormValue;
   const [v, setV] = useState<JobFormValue>(initial ?? {
     title: "", description: "", location: "", employment_type: "full_time", experience_min: null, experience_max: null,
     required_skills: [], preferred_skills: [], responsibilities: [],
-    interview_template_id: templates.find((t) => t.is_default)?.id ?? templates[0]?.id ?? null, status: "active",
+    rounds: [{ key: newRoundKey(), name: "Screening", template_id: templates.find((t) => t.is_default)?.id ?? templates[0]?.id ?? "" }], status: "active",
   });
   const [respText, setRespText] = useState((initial?.responsibilities ?? []).join("\n"));
   const [busy, setBusy] = useState(false);
@@ -56,7 +57,10 @@ export function JobForm({ initial, jobId, templates }: { initial?: JobFormValue;
     e.preventDefault();
     setBusy(true);
     setErrors({});
-    const payload = { ...v, location: v.location || null, responsibilities: respText.split("\n").map((s) => s.replace(/^[-*•]\s*/, "").trim()).filter(Boolean) };
+    const payload = {
+      ...v, location: v.location || null, responsibilities: respText.split("\n").map((s) => s.replace(/^[-*•]\s*/, "").trim()).filter(Boolean),
+      rounds: v.rounds.map(({ id, name, template_id }) => ({ ...(id ? { id } : {}), name: name.trim(), template_id })),
+    };
     try {
       const res = await api<{ id?: string }>(jobId ? `/api/jobs/${jobId}` : "/api/jobs", { method: jobId ? "PUT" : "POST", body: payload });
       toast.success(jobId ? "Job updated" : "Job created — analyzing the description with AI");
@@ -72,9 +76,10 @@ export function JobForm({ initial, jobId, templates }: { initial?: JobFormValue;
 
   return (
     <form onSubmit={submit} className="rounded-xl border bg-card px-6 py-8">
+      <p className="-mt-2 mb-6 text-xs text-muted-foreground">Fields marked <span className="text-destructive">*</span> are required.</p>
       <Section title="Basics" description="How the role appears to your team and in candidate invitations.">
         <div className="space-y-1.5">
-          <Label htmlFor="title">Job title</Label>
+          <Label htmlFor="title" required>Job title</Label>
           <Input id="title" value={v.title} onChange={(e) => set("title", e.target.value)} placeholder="Senior Full Stack Engineer" aria-invalid={!!errors.title} />
           {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
         </div>
@@ -119,16 +124,11 @@ export function JobForm({ initial, jobId, templates }: { initial?: JobFormValue;
           <Textarea id="resp" rows={4} value={respText} onChange={(e) => setRespText(e.target.value)} />
         </div>
       </Section>
-      <Section title="Interview" description="The template defines sections, timing, question counts and follow-up limits.">
+      <Section title="Interview rounds" required description="The interviews candidates go through for this job, in order. Each round uses its own template (sections, timing, questions and follow-ups).">
+        <RoundsEditor value={v.rounds} onChange={(r) => set("rounds", r)} templates={templates}
+          error={Object.entries(errors).find(([k]) => k.startsWith("rounds"))?.[1]} />
         <div className="space-y-1.5">
-          <Label htmlFor="tpl">Interview template</Label>
-          <select id="tpl" className={selectClass} value={v.interview_template_id ?? ""} onChange={(e) => set("interview_template_id", e.target.value || null)}>
-            <option value="">Select a template…</option>
-            {templates.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.total_minutes} min</option>)}
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="status">Status</Label>
+          <Label htmlFor="status" required>Status</Label>
           <select id="status" className={selectClass} value={v.status} onChange={(e) => set("status", e.target.value as JobFormValue["status"])}>
             <option value="draft">Draft</option><option value="active">Active</option><option value="paused">Paused</option><option value="closed">Closed</option>
           </select>

@@ -7,6 +7,7 @@ import { parseJob } from "@/lib/ai/job-parser";
 import { log } from "@/lib/logger";
 import { runInBackground } from "@/lib/background";
 import type { JobRequirements } from "@/lib/validation/ai-schemas";
+import { MAX_ROUNDS, RoundInputSchema, saveRounds } from "./rounds";
 
 const list = z.array(z.string().trim().min(1).max(80)).max(40);
 
@@ -20,7 +21,8 @@ export const JobInputSchema = z.object({
   required_skills: list.default([]),
   preferred_skills: list.default([]),
   responsibilities: z.array(z.string().trim().min(1).max(300)).max(30).default([]),
-  interview_template_id: z.string().uuid().nullable().default(null),
+  /** Interview rounds in order (e.g. Screening → Technical), each with its own template. */
+  rounds: z.array(RoundInputSchema).min(1, "Add at least one interview round").max(MAX_ROUNDS),
   status: z.enum(["draft", "active", "paused", "closed"]).default("draft"),
 }).refine((j) => j.experience_min == null || j.experience_max == null || j.experience_min <= j.experience_max, {
   message: "Minimum experience cannot exceed maximum",
@@ -72,22 +74,16 @@ export async function getJob(orgId: string, jobId: string) {
   return job ?? null;
 }
 
-async function assertTemplate(orgId: string, templateId: string | null) {
-  if (!templateId) return;
-  const rows = await withOrg(orgId, (tx) => tx`select 1 from interview_templates where id = ${templateId} and organization_id = ${orgId}`);
-  if (!rows.length) throw new ApiError(400, "Selected interview template was not found.");
-}
-
 export async function createJob(orgId: string, userId: string, input: JobInput) {
-  await assertTemplate(orgId, input.interview_template_id);
   const id = await withOrg(orgId, async (tx) => {
     const [row] = await tx<{ id: string }[]>`
       insert into jobs (organization_id, title, description, location, employment_type, experience_min, experience_max,
         required_skills, preferred_skills, responsibilities, interview_template_id, status, created_by, parse_status)
       values (${orgId}, ${input.title}, ${input.description}, ${input.location}, ${input.employment_type}, ${input.experience_min},
         ${input.experience_max}, ${json(input.required_skills)}, ${json(input.preferred_skills)}, ${json(input.responsibilities)},
-        ${input.interview_template_id}, ${input.status}, ${userId}, ${input.description ? "pending" : null})
+        ${input.rounds[0].template_id}, ${input.status}, ${userId}, ${input.description ? "pending" : null})
       returning id`;
+    await saveRounds(tx, orgId, row.id, input.rounds);
     await audit(tx, { orgId, userId, action: "job.created", entityType: "job", entityId: row.id });
     return row.id;
   });
@@ -96,7 +92,6 @@ export async function createJob(orgId: string, userId: string, input: JobInput) 
 }
 
 export async function updateJob(orgId: string, userId: string, jobId: string, input: JobInput) {
-  await assertTemplate(orgId, input.interview_template_id);
   const descChanged = await withOrg(orgId, async (tx) => {
     const [prev] = await tx<{ description: string; required_skills: string[]; preferred_skills: string[] }[]>`
       select description, required_skills, preferred_skills from jobs where id = ${jobId} and organization_id = ${orgId}`;
@@ -105,8 +100,9 @@ export async function updateJob(orgId: string, userId: string, jobId: string, in
       update jobs set title = ${input.title}, description = ${input.description}, location = ${input.location},
         employment_type = ${input.employment_type}, experience_min = ${input.experience_min}, experience_max = ${input.experience_max},
         required_skills = ${json(input.required_skills)}, preferred_skills = ${json(input.preferred_skills)},
-        responsibilities = ${json(input.responsibilities)}, interview_template_id = ${input.interview_template_id}, status = ${input.status}
+        responsibilities = ${json(input.responsibilities)}, status = ${input.status}
       where id = ${jobId} and organization_id = ${orgId}`;
+    await saveRounds(tx, orgId, jobId, input.rounds);
     await audit(tx, { orgId, userId, action: "job.updated", entityType: "job", entityId: jobId });
     return prev.description !== input.description
       || JSON.stringify(prev.required_skills) !== JSON.stringify(input.required_skills)

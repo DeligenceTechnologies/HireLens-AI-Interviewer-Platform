@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CheckCircle2, Loader2, RefreshCw, Send, Star, XCircle } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -9,12 +10,18 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { CopyButton } from "@/components/common/copy-button";
 import { useAction } from "@/lib/client/use-action";
+import { emptyChoice, type RoundChoice, RoundPicker } from "@/components/interview/round-picker";
 
-export function ApplicationActions({ id, status, interviewId, canWrite, canInvite }: { id: string; status: string; interviewId: string | null; canWrite: boolean; canInvite: boolean }) {
+export function ApplicationActions({ id, status, interviewId, canWrite, canInvite, jobId, candidateId, candidateName }: {
+  id: string; status: string; interviewId: string | null; canWrite: boolean; canInvite: boolean; jobId: string; candidateId: string; candidateName: string;
+}) {
   const { run, pending } = useAction();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [sendInvite, setSendInvite] = useState(true);
   const [link, setLink] = useState<string | null>(null);
+  const [choice, setChoice] = useState<RoundChoice>(emptyChoice);
+  const [blocked, setBlocked] = useState(false);
 
   const invited = !!interviewId;
   return (
@@ -39,7 +46,11 @@ export function ApplicationActions({ id, status, interviewId, canWrite, canInvit
           <Star /> Shortlist
         </Button>
       )}
-      {!invited && canInvite && <Button onClick={() => { setLink(null); setOpen(true); }}><Send /> Invite to AI interview</Button>}
+      {canInvite && (
+        <Button variant={invited ? "outline" : "default"} onClick={() => { setLink(null); setOpen(true); }}>
+          <Send /> {invited ? "Invite to another round" : "Invite to AI interview"}
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={(o) => !pending && setOpen(o)}>
         <DialogContent className="sm:max-w-lg">
           {link ? (
@@ -49,19 +60,20 @@ export function ApplicationActions({ id, status, interviewId, canWrite, canInvit
                 <DialogDescription>{sendInvite ? "The invitation email has been sent. " : ""}This personal link is shown only once.</DialogDescription>
               </DialogHeader>
               <div className="flex items-center gap-2"><Input readOnly value={link} className="font-mono text-xs" /><CopyButton value={link} /></div>
-              <DialogFooter><Button onClick={() => setOpen(false)}>Done</Button></DialogFooter>
+              <DialogFooter><Button onClick={() => { setOpen(false); router.refresh(); }}>Done</Button></DialogFooter>
             </>
           ) : (
             <>
               <DialogHeader>
                 <DialogTitle>Invite to AI interview</DialogTitle>
-                <DialogDescription>A personalized interview is generated from this job and the applicant&apos;s resume, using the job&apos;s interview template.</DialogDescription>
+                <DialogDescription>A personalized interview is generated from this job and the applicant&apos;s resume, using the round&apos;s template.</DialogDescription>
               </DialogHeader>
+              {open && <RoundPicker jobId={jobId} candidateId={candidateId} candidateName={candidateName} onChange={(c, b) => { setChoice(c); setBlocked(b); }} />}
               <label className="flex items-center gap-2 text-sm"><Checkbox checked={sendInvite} onCheckedChange={(c) => setSendInvite(!!c)} /> Email the invitation to the applicant now</label>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button disabled={!!pending} onClick={async () => {
-                  const r = await run<{ link: string }>("invite", `/api/applications/${id}/invite`, { body: { sendInvite }, success: "Interview created" });
+                <Button disabled={!!pending || blocked} onClick={async () => {
+                  const r = await run<{ link: string }>("invite", `/api/applications/${id}/invite`, { body: { sendInvite, ...choice }, success: "Interview created", refresh: false });
                   if (r) setLink(r.link);
                 }}>{pending === "invite" && <Loader2 className="animate-spin" />}{sendInvite ? "Send invitation" : "Create interview"}</Button>
               </DialogFooter>

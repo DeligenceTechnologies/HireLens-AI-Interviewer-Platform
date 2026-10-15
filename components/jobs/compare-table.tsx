@@ -12,6 +12,7 @@ type Row = {
   status: string;
   duration_seconds: number | null;
   completed_at: string | null;
+  attempt?: number;
   sections: Record<string, { assessment: string | null; score: number | null; status: string }>;
 };
 
@@ -49,7 +50,7 @@ export function CompareTable({ columns, rows, showScores }: { columns: string[];
         <tbody className="divide-y">
           {sorted.map((r) => (
             <tr key={r.id} className="hover:bg-muted/30">
-              <td className="sticky left-0 bg-card px-4 py-3 font-medium"><Link href={`/interviews/${r.id}/report`} className="hover:text-primary">{r.candidate_name}</Link></td>
+              <td className="sticky left-0 bg-card px-4 py-3 font-medium"><Link href={`/interviews/${r.id}/report`} className="hover:text-primary">{r.candidate_name}</Link>{(r.attempt ?? 1) > 1 && <span className="ml-1.5 text-xs font-normal text-muted-foreground">attempt {r.attempt}</span>}</td>
               <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
               {columns.map((c) => (
                 <td key={c} className="px-4 py-3">

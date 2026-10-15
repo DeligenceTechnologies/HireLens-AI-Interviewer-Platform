@@ -4,6 +4,7 @@ import { AutoRefresh } from "@/components/common/auto-refresh";
 import { PageHeader } from "@/components/common/page-header";
 import { StatusBadge } from "@/components/common/status-badge";
 import { InterviewActions } from "@/components/interviews/interview-actions";
+import { roundLabel } from "@/components/interviews/interview-table";
 import { InterviewViewer, type ViewerTab } from "@/components/reports/interview-viewer";
 import { can } from "@/lib/auth/permissions";
 import { requireAuth } from "@/lib/auth/session";
@@ -34,6 +35,7 @@ export async function InterviewPage({ params, tab }: { params: Promise<{ intervi
         title={<span className="flex flex-wrap items-center gap-3">{detail.candidate_name} <StatusBadge status={detail.status} /></span>}
         meta={<>
           <Link href={`/jobs/${detail.job_id}`} className="hover:text-foreground">{detail.job_title}</Link>
+          {roundLabel(detail) && <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">{roundLabel(detail)}</span>}
           <span>{detail.started_at ? formatDate(detail.started_at, true) : `Created ${formatDate(detail.created_at)}`}</span>
           {detail.duration_seconds != null && <span>{formatDuration(detail.duration_seconds)}</span>}
         </>}

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/common/page-header";
 import { CompareTable } from "@/components/jobs/compare-table";
@@ -14,11 +15,22 @@ export default async function ComparePage(props: PageProps<"/jobs/[jobId]/compar
   if (!isUuid(jobId)) notFound();
   const job = await getJob(auth.orgId, jobId);
   if (!job) notFound();
-  const [data, { settings }] = await Promise.all([getComparison(auth.orgId, jobId), getSettings(auth.orgId)]);
+  const sp = await props.searchParams;
+  const [data, { settings }] = await Promise.all([getComparison(auth.orgId, jobId, typeof sp.round === "string" ? sp.round : null), getSettings(auth.orgId)]);
   return (
     <>
       <PageHeader back={{ href: `/jobs/${jobId}`, label: job.title }} title="Compare candidates"
         description="Section assessments side by side. These are evidence summaries, not rankings — open each report to review the evidence before deciding." />
+      {data.rounds.length > 1 && (
+        <nav className="mb-5 flex gap-1 overflow-x-auto border-b" aria-label="Interview round">
+          {data.rounds.map((r) => (
+            <Link key={r} href={`/jobs/${jobId}/compare?round=${encodeURIComponent(r)}`} aria-current={r === data.round ? "page" : undefined}
+              className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap ${r === data.round ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+              {r}
+            </Link>
+          ))}
+        </nav>
+      )}
       <CompareTable columns={data.columns} rows={data.rows.map((r) => ({ ...r, completed_at: r.completed_at?.toISOString() ?? null }))} showScores={settings.show_scores} />
     </>
   );

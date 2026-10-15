@@ -11,6 +11,7 @@ import { ResumeUploader } from "@/components/candidates/resume-uploader";
 import { InviteDialog } from "@/components/interview/invite-dialog";
 import { can } from "@/lib/auth/permissions";
 import { requireAuth } from "@/lib/auth/session";
+import { roundLabel } from "@/components/interviews/interview-table";
 import { formatDate } from "@/lib/format";
 import { isUuid } from "@/lib/ids";
 import { getCandidate } from "@/lib/services/candidates";
@@ -38,7 +39,7 @@ export default async function CandidatePage(props: PageProps<"/candidates/[candi
         </>}
         actions={<>
           <CandidateActions candidate={{ id: c.id, name: c.name, email: c.email, phone: c.phone }} canEdit={canWrite} canDelete={can(auth.role, "data:delete")} />
-          {jobs.length > 0 && <InviteDialog candidateId={c.id} jobs={jobs.map((j) => ({ id: j.id, label: j.title }))} triggerLabel="Invite to interview" />}
+          {jobs.length > 0 && <InviteDialog candidateId={c.id} candidateName={c.name} jobs={jobs.map((j) => ({ id: j.id, label: j.title }))} triggerLabel="Invite to interview" />}
         </>}
       />
       <div className="grid gap-6 lg:grid-cols-3">
@@ -72,7 +73,10 @@ export default async function CandidatePage(props: PageProps<"/candidates/[candi
                 {c.interviews.map((i) => (
                   <li key={i.id}>
                     <Link href={`/interviews/${i.id}`} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-muted/40">
-                      <div className="min-w-0"><p className="truncate text-sm font-medium">{i.job_title}</p><p className="text-xs text-muted-foreground">{formatDate(i.created_at)}</p></div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{i.job_title}</p>
+                        <p className="text-xs text-muted-foreground">{[roundLabel(i), formatDate(i.created_at)].filter(Boolean).join(" · ")}</p>
+                      </div>
                       <StatusBadge status={i.status} />
                     </Link>
                   </li>

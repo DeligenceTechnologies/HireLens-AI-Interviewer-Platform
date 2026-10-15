@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CopyButton } from "@/components/common/copy-button";
 import { api, ClientApiError } from "@/lib/client/api";
+import { emptyChoice, type RoundChoice, RoundPicker } from "./round-picker";
 
 type Option = { id: string; label: string; sub?: string };
 
@@ -20,9 +21,10 @@ const selectClass = "h-9 w-full rounded-lg border border-input bg-background px-
  * Invite a candidate to an AI interview. Used from a job (pick/create a
  * candidate) or from a candidate (pick a job).
  */
-export function InviteDialog({ jobId, candidateId, jobs, triggerLabel = "Invite candidate" }: {
+export function InviteDialog({ jobId, candidateId, candidateName, jobs, triggerLabel = "Invite candidate" }: {
   jobId?: string;
   candidateId?: string;
+  candidateName?: string;
   jobs?: Option[];
   triggerLabel?: string;
 }) {
@@ -39,6 +41,8 @@ export function InviteDialog({ jobId, candidateId, jobs, triggerLabel = "Invite 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
+  const [choice, setChoice] = useState<RoundChoice>(emptyChoice);
+  const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
     if (!open || candidateId || mode !== "existing") return;
@@ -73,7 +77,7 @@ export function InviteDialog({ jobId, candidateId, jobs, triggerLabel = "Invite 
       }
       if (!cid) throw new ClientApiError("Select a candidate.", 400);
       if (!selectedJob) throw new ClientApiError("Select a job.", 400);
-      const res = await api<{ id: string; link: string }>("/api/interviews", { body: { jobId: selectedJob, candidateId: cid, sendInvite } });
+      const res = await api<{ id: string; link: string }>("/api/interviews", { body: { jobId: selectedJob, candidateId: cid, sendInvite, ...choice } });
       setLink(res.link);
       toast.success(sendInvite ? "Invitation sent" : "Interview created");
       router.refresh();
@@ -113,7 +117,7 @@ export function InviteDialog({ jobId, candidateId, jobs, triggerLabel = "Invite 
               <div className="space-y-4">
                 {!jobId && jobs && (
                   <div className="space-y-1.5">
-                    <Label htmlFor="inv-job">Job</Label>
+                    <Label htmlFor="inv-job" required>Job</Label>
                     <select id="inv-job" className={selectClass} value={selectedJob} onChange={(e) => setSelectedJob(e.target.value)}>
                       {jobs.length === 0 && <option value="">No active jobs</option>}
                       {jobs.map((j) => <option key={j.id} value={j.id}>{j.label}</option>)}
@@ -131,11 +135,11 @@ export function InviteDialog({ jobId, candidateId, jobs, triggerLabel = "Invite 
                     </div>
                     {mode === "new" ? (
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="space-y-1.5"><Label htmlFor="inv-name">Full name</Label><Input id="inv-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-                        <div className="space-y-1.5"><Label htmlFor="inv-email">Email</Label><Input id="inv-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+                        <div className="space-y-1.5"><Label htmlFor="inv-name" required>Full name</Label><Input id="inv-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+                        <div className="space-y-1.5"><Label htmlFor="inv-email" required>Email</Label><Input id="inv-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
                         <div className="space-y-1.5"><Label htmlFor="inv-phone">Phone <span className="font-normal text-muted-foreground">(optional)</span></Label><Input id="inv-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
                         <div className="space-y-1.5">
-                          <Label htmlFor="inv-file">Resume <span className="font-normal text-muted-foreground">(PDF/DOCX)</span></Label>
+                          <Label htmlFor="inv-file">Resume <span className="font-normal text-muted-foreground">(optional · PDF/DOCX)</span></Label>
                           <label htmlFor="inv-file" className="flex h-9 cursor-pointer items-center gap-2 truncate rounded-lg border border-dashed px-2.5 text-sm text-muted-foreground hover:bg-muted">
                             <Upload className="size-4 shrink-0" /> <span className="truncate">{file ? file.name : "Choose file"}</span>
                           </label>
@@ -158,6 +162,14 @@ export function InviteDialog({ jobId, candidateId, jobs, triggerLabel = "Invite 
                     )}
                   </>
                 )}
+                {selectedJob && (
+                  <RoundPicker
+                    jobId={selectedJob}
+                    candidateId={candidateId ?? (mode === "existing" && selectedCandidate ? selectedCandidate : null)}
+                    candidateName={candidateName ?? (mode === "new" ? form.name : candidates.find((c) => c.id === selectedCandidate)?.label)}
+                    onChange={(c, b) => { setChoice(c); setBlocked(b); }}
+                  />
+                )}
                 <label className="flex items-center gap-2 text-sm">
                   <Checkbox checked={sendInvite} onCheckedChange={(c) => setSendInvite(!!c)} /> Email the invitation to the candidate now
                 </label>
@@ -165,7 +177,7 @@ export function InviteDialog({ jobId, candidateId, jobs, triggerLabel = "Invite 
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
-                <Button onClick={submit} disabled={busy}>{busy && <Loader2 className="animate-spin" />}{sendInvite ? "Send invitation" : "Create interview"}</Button>
+                <Button onClick={submit} disabled={busy || blocked}>{busy && <Loader2 className="animate-spin" />}{sendInvite ? "Send invitation" : "Create interview"}</Button>
               </DialogFooter>
             </>
           )}

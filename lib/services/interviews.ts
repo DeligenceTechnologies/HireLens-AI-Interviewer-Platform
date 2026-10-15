@@ -10,7 +10,8 @@ import { generateToken, hashToken } from "@/lib/security/tokens";
 import type { StoredPlan, InterviewStatus } from "@/types/interview";
 import type { SectionEvaluation } from "@/lib/validation/ai-schemas";
 import { readSettings } from "./org-settings";
-import { assertQuotaAvailable } from "./quota";
+import { assertQuotaAvailable, COUNTED_STATUSES } from "./quota";
+import { isOpen, MAX_ROUNDS } from "./rounds";
 
 export type InterviewListRow = {
   id: string;
@@ -28,6 +29,8 @@ export type InterviewListRow = {
   job_id: string;
   job_title: string;
   report_status: string | null;
+  round_name: string | null;
+  attempt: number;
 };
 
 export const INTERVIEW_PAGE_SIZE = 25;
@@ -50,7 +53,7 @@ export async function listInterviews(orgId: string, opts: { q?: string; status?:
       ${opts.to ? tx`and i.created_at < (${opts.to}::date + 1)` : tx``}
       ${q ? tx`and (c.name ilike ${q} or c.email::text ilike ${q} or j.title ilike ${q})` : tx``}`;
     const rows = await tx<InterviewListRow[]>`
-      select i.id, i.status, i.plan_status, i.created_at, i.invited_at, i.started_at, i.completed_at, i.duration_seconds,
+      select i.id, i.status, i.plan_status, i.created_at, i.invited_at, i.started_at, i.completed_at, i.duration_seconds, i.round_name, i.attempt,
         c.id as candidate_id, c.name as candidate_name, c.email as candidate_email, j.id as job_id, j.title as job_title,
         r.status::text as report_status,
         (select count(*)::int from interview_feedback f where f.interview_id = i.id and f.kind = 'issue') as issue_count
@@ -70,24 +73,80 @@ export async function listInterviews(orgId: string, opts: { q?: string; status?:
  * configuration (snapshot) and generates the personalized plan in the background.
  * Returns the one-time plaintext link (only the hash is stored).
  */
-export async function createInterview(orgId: string, userId: string, input: { jobId: string; candidateId: string; templateId?: string | null; sendInvite: boolean }) {
+export type CreateInterviewInput = {
+  jobId: string;
+  candidateId: string;
+  /** One of the job's rounds. Without it (and without templateId) the candidate's next round is used. */
+  roundId?: string | null;
+  /** A one-off template instead of a round; with newRoundName it is also saved to the job as a new round. */
+  templateId?: string | null;
+  newRoundName?: string | null;
+  /** Confirms inviting the candidate to a round they already completed (another attempt). */
+  reinvite?: boolean;
+  reason?: string | null;
+  sendInvite: boolean;
+};
+
+export async function createInterview(orgId: string, userId: string, input: CreateInterviewInput) {
   const token = generateToken();
   const result = await withOrg(orgId, async (tx) => {
-    const [job] = await tx<{ id: string; title: string; status: string; interview_template_id: string | null }[]>`
-      select id, title, status, interview_template_id from jobs where id = ${input.jobId} and organization_id = ${orgId}`;
+    const [job] = await tx<{ id: string; title: string; status: string }[]>`
+      select id, title, status from jobs where id = ${input.jobId} and organization_id = ${orgId}`;
     if (!job) throw new ApiError(404, "Job not found");
     if (job.status === "closed") throw new ApiError(409, "This job is closed.");
     const [cand] = await tx<{ id: string; name: string; email: string }[]>`
       select id, name, email from candidates where id = ${input.candidateId} and organization_id = ${orgId}`;
     if (!cand) throw new ApiError(404, "Candidate not found");
-    const active = await tx`select 1 from interviews where job_id = ${job.id} and candidate_id = ${cand.id}
-      and status not in ('cancelled','expired','failed')`;
-    if (active.length) throw new ApiError(409, "This candidate already has an interview for this job.");
-    await assertQuotaAvailable(tx, orgId);
 
-    const templateId = input.templateId ?? job.interview_template_id
-      ?? (await tx<{ id: string }[]>`select id from interview_templates where organization_id = ${orgId} order by is_default desc, created_at limit 1`)[0]?.id;
-    if (!templateId) throw new ApiError(400, "Create an interview template first.");
+    // Which round (and so which template) is this interview for?
+    let round: { id: string | null; name: string; template_id: string | null };
+    if (input.roundId) {
+      const [r] = await tx<{ id: string; name: string; template_id: string | null }[]>`
+        select id, name, template_id from job_rounds where id = ${input.roundId} and job_id = ${job.id}`;
+      if (!r) throw new ApiError(404, "Interview round not found");
+      round = r;
+    } else if (input.templateId) {
+      const [t] = await tx<{ id: string; name: string }[]>`select id, name from interview_templates where id = ${input.templateId} and organization_id = ${orgId}`;
+      if (!t) throw new ApiError(400, "Selected interview template was not found.");
+      const newName = input.newRoundName?.trim();
+      if (newName) {
+        const [{ count }] = await tx<{ count: number }[]>`select count(*)::int as count from job_rounds where job_id = ${job.id}`;
+        if (count >= MAX_ROUNDS) throw new ApiError(400, `A job can have up to ${MAX_ROUNDS} interview rounds.`);
+        [round] = await tx<{ id: string; name: string; template_id: string }[]>`
+          insert into job_rounds (organization_id, job_id, name, template_id, sort_order)
+          values (${orgId}, ${job.id}, ${newName.slice(0, 80)}, ${t.id}, ${count}) returning id, name, template_id`;
+        await audit(tx, { orgId, userId, action: "job.updated", entityType: "job", entityId: job.id, metadata: { round_added: newName } });
+      } else {
+        round = { id: null, name: t.name, template_id: t.id };
+      }
+    } else {
+      // Default: the first round this candidate hasn't completed (or the last round).
+      const rounds = await tx<{ id: string; name: string; template_id: string | null; done: boolean }[]>`
+        select r.id, r.name, r.template_id, exists (
+          select 1 from interviews i where i.round_id = r.id and i.candidate_id = ${cand.id} and i.status::text = any(${COUNTED_STATUSES})
+        ) as done
+        from job_rounds r where r.job_id = ${job.id} order by r.sort_order, r.created_at`;
+      if (!rounds.length) throw new ApiError(400, "Add an interview round to this job first.");
+      round = rounds.find((r) => !r.done) ?? rounds[rounds.length - 1];
+    }
+    const templateId = round.template_id;
+    if (!templateId) throw new ApiError(400, `The ${round.name} round has no interview template. Edit the job to choose one.`);
+
+    // One unfinished invite per round; a completed round needs an explicit "invite again".
+    const history = await tx<{ status: string; token_expires_at: Date | null; completed_at: Date | null; started_at: Date | null }[]>`
+      select status, token_expires_at, completed_at, started_at from interviews
+      where job_id = ${job.id} and candidate_id = ${cand.id}
+        and ${round.id ? tx`round_id = ${round.id}` : tx`round_id is null and template_id = ${templateId}`}`;
+    if (history.some(isOpen)) {
+      throw new ApiError(409, `${cand.name} already has a ${round.name} interview that hasn't been completed. Resend or cancel it from the interview page first.`, "interview_pending");
+    }
+    const done = history.filter((h) => COUNTED_STATUSES.includes(h.status));
+    if (done.length && !input.reinvite) {
+      const last = done.map((h) => h.completed_at).filter(Boolean).sort((a, b) => b!.getTime() - a!.getTime())[0];
+      throw new ApiError(409, `${cand.name} already completed ${round.name}${last ? ` on ${last.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}. Invite again for another attempt?`, "already_completed");
+    }
+    const attempt = 1 + history.filter((h) => h.started_at).length;
+    await assertQuotaAvailable(tx, orgId);
     const sections = await tx<{ id: string; name: string; objective: string; instructions: string; duration_minutes: number; min_questions: number; max_questions: number; max_followups: number; evaluation_criteria: string[]; scoring_enabled: boolean }[]>`
       select * from interview_template_sections where template_id = ${templateId} and organization_id = ${orgId} and enabled order by sort_order`;
     if (!sections.length) throw new ApiError(400, "The selected template has no enabled sections.");
@@ -95,8 +154,8 @@ export async function createInterview(orgId: string, userId: string, input: { jo
     const [org] = await tx<{ settings: unknown }[]>`select settings from organizations where id = ${orgId}`;
     const settings = readSettings(org?.settings);
     const [iv] = await tx<{ id: string }[]>`
-      insert into interviews (organization_id, job_id, candidate_id, template_id, secure_token_hash, token_expires_at, status, created_by)
-      values (${orgId}, ${job.id}, ${cand.id}, ${templateId}, ${hashToken(token)},
+      insert into interviews (organization_id, job_id, candidate_id, template_id, round_id, round_name, attempt, secure_token_hash, token_expires_at, status, created_by)
+      values (${orgId}, ${job.id}, ${cand.id}, ${templateId}, ${round.id}, ${round.name}, ${attempt}, ${hashToken(token)},
               now() + make_interval(days => ${settings.invite_expiry_days}), 'created', ${userId})
       returning id`;
     for (const [i, s] of sections.entries()) {
@@ -111,7 +170,10 @@ export async function createInterview(orgId: string, userId: string, input: { jo
           scoring_enabled: s.scoring_enabled,
         })})`;
     }
-    await audit(tx, { orgId, userId, action: "interview.created", entityType: "interview", entityId: iv.id, metadata: { job_id: job.id, candidate_id: cand.id } });
+    await audit(tx, {
+      orgId, userId, action: "interview.created", entityType: "interview", entityId: iv.id,
+      metadata: { job_id: job.id, candidate_id: cand.id, round: round.name, attempt, ...(attempt > 1 && input.reason ? { reason: input.reason.slice(0, 300) } : {}) },
+    });
     // Whichever page the invite came from, an open application for this job is now handled.
     await tx`update job_applications set interview_id = ${iv.id},
         status = case when status in ('new', 'shortlisted') then 'interview_invited'::application_status else status end,
@@ -132,8 +194,8 @@ export function interviewLink(token: string) {
 
 export async function sendInvitation(orgId: string, userId: string, interviewId: string, link: string) {
   const info = await withOrg(orgId, async (tx) => {
-    const [row] = await tx<{ status: string; candidate_name: string; candidate_email: string; job_title: string; org_name: string; minutes: number; token_expires_at: Date | null }[]>`
-      select i.status, c.name as candidate_name, c.email as candidate_email, j.title as job_title, o.name as org_name, i.token_expires_at,
+    const [row] = await tx<{ status: string; candidate_name: string; candidate_email: string; job_title: string; org_name: string; minutes: number; token_expires_at: Date | null; round_name: string | null }[]>`
+      select i.status, c.name as candidate_name, c.email as candidate_email, j.title as job_title, o.name as org_name, i.token_expires_at, i.round_name,
         (select coalesce(sum((s.config->>'duration_minutes')::int), 0)::int from interview_sections s where s.interview_id = i.id) as minutes
       from interviews i join candidates c on c.id = i.candidate_id join jobs j on j.id = i.job_id join organizations o on o.id = i.organization_id
       where i.id = ${interviewId} and i.organization_id = ${orgId}`;
@@ -150,6 +212,7 @@ export async function sendInvitation(orgId: string, userId: string, interviewId:
     minutes: info.minutes,
     link,
     expiresAt: info.token_expires_at,
+    roundName: info.round_name,
   });
   await sendEmail({ to: info.candidate_email, subject: tpl.subject, text: tpl.text, orgId });
 }
@@ -178,18 +241,18 @@ export async function sendReminder(orgId: string, userId: string, interviewId: s
   // Links are stored hashed, so a reminder issues a fresh link.
   const token = generateToken();
   const info = await withOrg(orgId, async (tx) => {
-    const [row] = await tx<{ candidate_name: string; candidate_email: string; job_title: string; org_name: string }[]>`
+    const [row] = await tx<{ candidate_name: string; candidate_email: string; job_title: string; org_name: string; round_name: string | null }[]>`
       update interviews i set secure_token_hash = ${hashToken(token)}, last_reminder_at = now()
       from candidates c, jobs j, organizations o
       where i.id = ${interviewId} and i.organization_id = ${orgId} and c.id = i.candidate_id and j.id = i.job_id and o.id = i.organization_id
         and i.status in ('invited','consent_pending','device_check','ready')
-      returning c.name as candidate_name, c.email as candidate_email, j.title as job_title, o.name as org_name`;
+      returning c.name as candidate_name, c.email as candidate_email, j.title as job_title, o.name as org_name, i.round_name`;
     if (!row) throw new ApiError(409, "Reminders can only be sent for interviews that haven't started.");
     await audit(tx, { orgId, userId, action: "interview.reminded", entityType: "interview", entityId: interviewId });
     return row;
   });
   const link = interviewLink(token);
-  const tpl = emailTemplates.reminder({ candidateName: info.candidate_name.split(" ")[0], jobTitle: info.job_title, companyName: info.org_name, link });
+  const tpl = emailTemplates.reminder({ candidateName: info.candidate_name.split(" ")[0], jobTitle: info.job_title, companyName: info.org_name, link, roundName: info.round_name });
   await sendEmail({ to: info.candidate_email, subject: tpl.subject, text: tpl.text, orgId });
   return link;
 }
@@ -222,9 +285,9 @@ export async function getInterviewDetail(orgId: string, interviewId: string) {
       started_at: Date | null; completed_at: Date | null; duration_seconds: number | null; consent_given: boolean;
       consent_timestamp: Date | null; consent_version: string | null; interview_plan: StoredPlan | null; processing_error: string | null;
       token_expires_at: Date | null; updated_at: Date; candidate_id: string; candidate_name: string; candidate_email: string; job_id: string; job_title: string;
-      template_name: string | null;
+      template_name: string | null; round_name: string | null; attempt: number;
     }[]>`
-      select i.id, i.status, i.plan_status, i.plan_error, i.created_at, i.invited_at, i.started_at, i.completed_at, i.duration_seconds,
+      select i.id, i.status, i.plan_status, i.plan_error, i.created_at, i.invited_at, i.started_at, i.completed_at, i.duration_seconds, i.round_name, i.attempt,
         i.consent_given, i.consent_timestamp, i.consent_version, i.interview_plan, i.processing_error, i.token_expires_at, i.updated_at,
         c.id as candidate_id, c.name as candidate_name, c.email as candidate_email, j.id as job_id, j.title as job_title,
         t.name as template_name

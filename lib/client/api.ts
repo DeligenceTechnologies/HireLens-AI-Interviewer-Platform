@@ -1,7 +1,7 @@
 "use client";
 
 export class ClientApiError extends Error {
-  constructor(message: string, public status: number, public issues?: { path: string; message: string }[]) {
+  constructor(message: string, public status: number, public issues?: { path: string; message: string }[], public code?: string) {
     super(message);
   }
 }
@@ -23,6 +23,6 @@ export async function api<T = unknown>(url: string, opts: { method?: string; bod
     throw new ClientApiError("Network error — check your connection and try again.", 0);
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ClientApiError(data.error ?? "Something went wrong.", res.status, data.issues);
+  if (!res.ok) throw new ClientApiError(data.error ?? "Something went wrong.", res.status, data.issues, data.code);
   return data as T;
 }

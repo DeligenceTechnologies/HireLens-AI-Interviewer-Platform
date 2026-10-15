@@ -56,7 +56,7 @@ export async function listTemplates(orgId: string) {
     select t.id, t.name, t.description, t.is_default, t.created_at, t.updated_at,
       (select count(*)::int from interview_template_sections s where s.template_id = t.id and s.enabled) as section_count,
       (select coalesce(sum(duration_minutes), 0)::int from interview_template_sections s where s.template_id = t.id and s.enabled) as total_minutes,
-      (select count(*)::int from jobs j where j.interview_template_id = t.id) as job_count
+      (select count(distinct r.job_id)::int from job_rounds r where r.template_id = t.id) as job_count
     from interview_templates t where t.organization_id = ${orgId}
     order by t.is_default desc, t.created_at desc`);
 }
@@ -96,8 +96,10 @@ export async function updateTemplate(orgId: string, userId: string, templateId: 
 
 export async function deleteTemplate(orgId: string, userId: string, templateId: string) {
   return withOrg(orgId, async (tx) => {
-    const [{ count }] = await tx<{ count: number }[]>`select count(*)::int as count from jobs where interview_template_id = ${templateId} and status in ('active','draft','paused')`;
-    if (count > 0) throw new ApiError(409, "This template is used by open jobs. Assign another template first.");
+    const [{ count }] = await tx<{ count: number }[]>`
+      select count(distinct j.id)::int as count from job_rounds r join jobs j on j.id = r.job_id
+      where r.template_id = ${templateId} and j.status in ('active','draft','paused')`;
+    if (count > 0) throw new ApiError(409, "This template is used by an interview round of an open job. Choose another template for that round first.");
     await tx`delete from interview_templates where id = ${templateId} and organization_id = ${orgId}`;
     await audit(tx, { orgId, userId, action: "template.deleted", entityType: "template", entityId: templateId });
   });

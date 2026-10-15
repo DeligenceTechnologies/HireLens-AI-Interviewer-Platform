@@ -58,9 +58,9 @@ export async function getCandidate(orgId: string, candidateId: string) {
     if (!c) return null;
     const documents = await tx<{ id: string; file_name: string; mime_type: string; file_size: number; created_at: Date }[]>`
       select id, file_name, mime_type, file_size, created_at from candidate_documents where candidate_id = ${candidateId} order by created_at desc`;
-    const interviews = await tx<{ id: string; status: string; job_title: string; job_id: string; created_at: Date; completed_at: Date | null }[]>`
-      select i.id, i.status, j.title as job_title, j.id as job_id, i.created_at, i.completed_at
-      from interviews i join jobs j on j.id = i.job_id where i.candidate_id = ${candidateId} order by i.created_at desc`;
+    const interviews = await tx<{ id: string; status: string; job_title: string; job_id: string; created_at: Date; completed_at: Date | null; round_name: string | null; attempt: number }[]>`
+      select i.id, i.status, j.title as job_title, j.id as job_id, i.created_at, i.completed_at, i.round_name, i.attempt
+      from interviews i join jobs j on j.id = i.job_id where i.candidate_id = ${candidateId} order by j.title, i.created_at desc`;
     return { ...c, documents, interviews };
   });
 }

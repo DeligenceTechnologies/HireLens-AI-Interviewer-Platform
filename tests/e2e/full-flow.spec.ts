@@ -32,7 +32,7 @@ test("recruiter to candidate to report", async ({ page, browser }) => {
   await page.getByLabel("Job description").fill("We need a senior engineer with 5+ years of React, Node.js and PostgreSQL experience. AWS is a plus.");
   await page.getByLabel("Required skills").fill("React");
   await page.getByLabel("Required skills").press("Enter");
-  await page.getByLabel("Interview template").selectOption({ label: "Quick Screening (15 min) · 15 min" });
+  await page.getByLabel("Round 1 template").selectOption({ label: "Quick Screening (15 min) · 15 min" });
   await page.getByRole("button", { name: "Create job" }).click();
   await expect(page.getByRole("heading", { name: /Senior Full Stack Engineer/ })).toBeVisible();
 
