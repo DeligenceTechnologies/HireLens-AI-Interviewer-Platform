@@ -28,8 +28,8 @@ export function NewCompanyButton({ defaultQuota }: { defaultQuota: number | null
           </DialogHeader>
           {link ? <LinkResult link={link} note="Send this link to the owner. It works once, only for this email, and expires in 14 days." /> : (
             <div className="space-y-3">
-              <div className="space-y-1.5"><Label htmlFor="nc-name">Company name</Label><Input id="nc-name" value={name} onChange={(e) => setName(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label htmlFor="nc-email">Owner email</Label><Input id="nc-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label htmlFor="nc-name" required>Company name</Label><Input id="nc-name" value={name} onChange={(e) => setName(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label htmlFor="nc-email" required>Owner email</Label><Input id="nc-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
               <QuotaInput id="nc-quota" value={quota} onChange={setQuota} />
             </div>
           )}

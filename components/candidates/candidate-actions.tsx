@@ -41,7 +41,7 @@ export function CandidateActions({ candidate, canEdit, canDelete }: { candidate:
           <div className="space-y-3">
             {(["name", "email", "phone"] as const).map((k) => (
               <div key={k} className="space-y-1.5">
-                <Label htmlFor={`e-${k}`} className="capitalize">{k}</Label>
+                <Label htmlFor={`e-${k}`} className="capitalize" required={k !== "phone"}>{k}{k === "phone" && <span className="font-normal normal-case text-muted-foreground">(optional)</span>}</Label>
                 <Input id={`e-${k}`} value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} />
               </div>
             ))}

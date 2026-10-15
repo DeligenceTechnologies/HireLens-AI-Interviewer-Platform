@@ -13,7 +13,7 @@ export function SignupForm({ invite, company }: {
     { name: "name", label: "Full name", autoComplete: "name" },
     { name: "email", label: "Work email", type: "email", autoComplete: "email", defaultValue: preset, readOnly: !!preset },
     ...(!invite && !company ? [
-      { name: "orgName", label: "Company / workspace name", autoComplete: "organization", placeholder: "Acme Inc." },
+      { name: "orgName", label: "Company / workspace name", autoComplete: "organization", placeholder: "Acme Inc.", optional: true },
       { name: "accessCode", label: "Access code", autoComplete: "off", hint: "Provided by the DeliberateHire AI team after approval." },
     ] : []),
     { name: "password", label: "Password", type: "password", autoComplete: "new-password", hint: "At least 10 characters." },

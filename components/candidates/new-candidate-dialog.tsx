@@ -43,7 +43,7 @@ export function NewCandidateDialog() {
           }}>
             {(["name", "email", "phone"] as const).map((k) => (
               <div key={k} className="space-y-1.5">
-                <Label htmlFor={`c-${k}`}>{k === "name" ? "Full name" : k === "email" ? "Email" : "Phone (optional)"}</Label>
+                <Label htmlFor={`c-${k}`} required={k !== "phone"}>{k === "name" ? "Full name" : k === "email" ? "Email" : <>Phone <span className="font-normal text-muted-foreground">(optional)</span></>}</Label>
                 <Input id={`c-${k}`} type={k === "email" ? "email" : "text"} value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} aria-invalid={!!errors[k]} />
                 {errors[k] && <p className="text-xs text-destructive">{errors[k]}</p>}
               </div>

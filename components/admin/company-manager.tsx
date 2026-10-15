@@ -118,8 +118,8 @@ export function MembersCard({ id, members, invites }: { id: string; members: Com
           <DialogHeader><DialogTitle>Add a member</DialogTitle><DialogDescription>People who already have an account join right away. Others get an invite link (valid 7 days).</DialogDescription></DialogHeader>
           {result ? (result.added ? <p className="text-sm">Added. They&apos;ll see this company the next time they sign in.</p> : <LinkResult link={result.link!} note="Invitation created. Share this link with them:" />) : (
             <div className="space-y-3">
-              <div className="space-y-1.5"><Label htmlFor="am-email">Email</Label><Input id="am-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label htmlFor="am-role">Role</Label>
+              <div className="space-y-1.5"><Label htmlFor="am-email" required>Email</Label><Input id="am-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label htmlFor="am-role" required>Role</Label>
                 <select id="am-role" value={role} onChange={(e) => setRole(e.target.value as Exclude<Role, "owner">)} className="h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm">
                   {MEMBER_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
                 </select>

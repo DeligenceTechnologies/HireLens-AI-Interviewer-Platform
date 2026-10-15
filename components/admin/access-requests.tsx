@@ -90,8 +90,8 @@ function RequestCard({ r, defaultQuota }: { r: AccessRequest; defaultQuota: numb
             <LinkResult link={link} note="Approved. Send this link to the client. It works once, only for this email, and expires in 14 days." />
           ) : (
             <div className="space-y-3">
-              <div className="space-y-1.5"><Label htmlFor={`cn-${r.id}`}>Company name</Label><Input id={`cn-${r.id}`} value={companyName} onChange={(e) => setCompanyName(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label htmlFor={`em-${r.id}`}>Owner email</Label><Input id={`em-${r.id}`} type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label htmlFor={`cn-${r.id}`} required>Company name</Label><Input id={`cn-${r.id}`} value={companyName} onChange={(e) => setCompanyName(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label htmlFor={`em-${r.id}`} required>Owner email</Label><Input id={`em-${r.id}`} type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
               <QuotaInput id={`q-${r.id}`} value={quota} onChange={setQuota} />
             </div>
           )}

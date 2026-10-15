@@ -76,8 +76,8 @@ export function TeamManager({ members, invites, me, assignable, canManage }: {
             <div className="space-y-2"><p className="text-sm">Invitation sent. You can also share this link directly:</p><div className="flex gap-2"><Input readOnly value={link} className="font-mono text-xs" /><CopyButton value={link} /></div></div>
           ) : (
             <div className="space-y-3">
-              <div className="space-y-1.5"><Label htmlFor="inv-email">Email</Label><Input id="inv-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label htmlFor="inv-role">Role</Label>
+              <div className="space-y-1.5"><Label htmlFor="inv-email" required>Email</Label><Input id="inv-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label htmlFor="inv-role" required>Role</Label>
                 <select id="inv-role" value={role} onChange={(e) => setRole(e.target.value as Role)} className="h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm">
                   {assignable.map((r) => <option key={r} value={r}>{LABEL[r]} — {DESC[r]}</option>)}
                 </select>

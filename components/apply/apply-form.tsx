@@ -65,7 +65,10 @@ export function ApplyForm({ slug, company, jobTitle }: { slug: string; company: 
         }
       }}
     >
-      <h2 className="text-lg font-semibold">Apply for this role</h2>
+      <div>
+        <h2 className="text-lg font-semibold">Apply for this role</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Fields marked <span className="text-destructive">*</span> are required.</p>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         {([
           ["name", "Full name", "text", "name", true],
@@ -74,14 +77,14 @@ export function ApplyForm({ slug, company, jobTitle }: { slug: string; company: 
           ["linkedin_url", "LinkedIn profile", "url", "url", false],
         ] as const).map(([name, label, type, ac, req]) => (
           <div key={name} className="space-y-1.5">
-            <Label htmlFor={`ap-${name}`}>{label}{!req && <span className="font-normal text-muted-foreground"> (optional)</span>}</Label>
-            <Input id={`ap-${name}`} name={name} type={type} autoComplete={ac} placeholder={name === "linkedin_url" ? "https://linkedin.com/in/…" : undefined} aria-invalid={!!fieldErrors[name]} />
+            <Label htmlFor={`ap-${name}`} required={req}>{label}{!req && <span className="font-normal text-muted-foreground"> (optional)</span>}</Label>
+            <Input id={`ap-${name}`} name={name} required={req} type={type} autoComplete={ac} placeholder={name === "linkedin_url" ? "https://linkedin.com/in/…" : undefined} aria-invalid={!!fieldErrors[name]} />
             {fieldErrors[name] && <p className="text-xs text-destructive">{fieldErrors[name]}</p>}
           </div>
         ))}
       </div>
       <div className="space-y-1.5">
-        <Label>Resume</Label>
+        <Label htmlFor="ap-resume" required>Resume</Label>
         <div
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
           onDragLeave={() => setDrag(false)}
@@ -107,7 +110,7 @@ export function ApplyForm({ slug, company, jobTitle }: { slug: string; company: 
       <label className="flex items-start gap-3 text-sm">
         <Checkbox checked={consent} onCheckedChange={(c) => setConsent(!!c)} className="mt-0.5" />
         <span className="text-muted-foreground">
-          I agree that {company} may store my application and use AI to compare my resume with this role&apos;s requirements. People on the hiring team review every application and make all decisions.
+          <span aria-hidden="true" className="mr-0.5 text-destructive">*</span>I agree that {company} may store my application and use AI to compare my resume with this role&apos;s requirements. People on the hiring team review every application and make all decisions.
         </span>
       </label>
       {fieldErrors.consent && <p className="text-xs text-destructive">{fieldErrors.consent}</p>}

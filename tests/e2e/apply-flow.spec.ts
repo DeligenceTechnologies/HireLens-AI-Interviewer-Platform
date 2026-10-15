@@ -52,7 +52,8 @@ test("public application with AI screening", async ({ page, browser }) => {
 
   await page.reload();
   await expect(page.getByRole("link", { name: "Morgan Applicant" })).toBeVisible();
-  await expect(page.getByText(/requirements$/).first()).toBeVisible({ timeout: 90_000 });
+  // The screening result ("3/4 requirements"), not the job's "Parsed requirements" heading.
+  await expect(page.getByText(/^\d+\/\d+ requirements$/).first()).toBeVisible({ timeout: 90_000 });
   await page.getByRole("link", { name: "Morgan Applicant" }).click();
   await expect(page.getByRole("heading", { name: /AI screening/ })).toBeVisible();
   await expect(page.getByRole("cell", { name: /PostgreSQL/ }).first()).toBeVisible();
@@ -74,7 +75,7 @@ test("sign-up is closed without an access code", async ({ page }) => {
   await page.getByLabel("Access code").fill("not-the-code");
   await page.getByLabel("Password").fill("long-enough-password");
   await page.getByRole("button", { name: "Create workspace" }).click();
-  await expect(page.getByText(/available by approval/)).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: /available by approval/ })).toBeVisible();
 });
 
 test("home page access request form", async ({ page }) => {

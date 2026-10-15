@@ -32,7 +32,7 @@ export function PrivacyForm({ retentionDays }: { retentionDays: number }) {
           ))}
           <button type="button" onClick={() => setCustom(true)} className={`rounded-lg border px-3 py-1.5 text-sm ${custom ? "border-primary bg-accent text-accent-foreground" : "hover:bg-muted"}`}>Custom</button>
         </div>
-        {custom && <div className="max-w-40 space-y-1.5"><Label htmlFor="ret">Days</Label><Input id="ret" type="number" min={1} max={3650} value={days} onChange={(e) => setDays(Math.max(1, Math.min(3650, Number(e.target.value) || 1)))} /></div>}
+        {custom && <div className="max-w-40 space-y-1.5"><Label htmlFor="ret" required>Days</Label><Input id="ret" type="number" min={1} max={3650} value={days} onChange={(e) => setDays(Math.max(1, Math.min(3650, Number(e.target.value) || 1)))} /></div>}
       </FormCard>
       <FormCard title="Run retention now" description="Applies the saved policy immediately. Deletions are logged in the audit log.">
         <ConfirmDialog title="Apply retention policy now?" description="Recordings and transcripts older than the retention period will be permanently deleted." confirmLabel="Delete expired data" destructive

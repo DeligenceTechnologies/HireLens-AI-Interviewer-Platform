@@ -74,7 +74,7 @@ function FeedbackForm({ token, onCancel, onDone }: { token: string; onCancel: ()
       onSubmit={(e) => { e.preventDefault(); if (rating) submit({ kind: "feedback", rating, message: message.trim() || undefined }); }}
     >
       <div className="space-y-1.5">
-        <Label>How was your interview experience?</Label>
+        <Label required>How was your interview experience?</Label>
         <div className="flex gap-1" role="radiogroup" aria-label="Rating" onMouseLeave={() => setHover(0)}>
           {[1, 2, 3, 4, 5].map((n) => (
             <button
@@ -115,7 +115,7 @@ function IssueForm({ token, onCancel, onDone }: { token: string; onCancel: () =>
       onSubmit={(e) => { e.preventDefault(); if (category) submit({ kind: "issue", category, message: message.trim() }); }}
     >
       <div className="space-y-1.5">
-        <Label>What went wrong?</Label>
+        <Label required>What went wrong?</Label>
         <div className="flex flex-wrap gap-2">
           {(Object.entries(ISSUE_CATEGORIES) as [IssueCategory, string][]).map(([key, label]) => (
             <button
@@ -131,7 +131,7 @@ function IssueForm({ token, onCancel, onDone }: { token: string; onCancel: () =>
         </div>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="issue-message">Describe what happened</Label>
+        <Label htmlFor="issue-message" required>Describe what happened</Label>
         <Textarea id="issue-message" rows={4} maxLength={2000} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="For example: the interviewer moved on before I finished my answer." />
       </div>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

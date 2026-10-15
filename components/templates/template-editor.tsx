@@ -64,7 +64,7 @@ function SectionEditor({ s, index, count, onChange, onMove, onRemove }: {
       </div>
       {open && (
         <div className="grid gap-4 border-t px-4 py-4 md:grid-cols-2">
-          <div className="space-y-1.5"><Label htmlFor={`n-${s.key}`}>Section name</Label><Input id={`n-${s.key}`} value={s.name} onChange={(e) => onChange({ name: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label htmlFor={`n-${s.key}`} required>Section name</Label><Input id={`n-${s.key}`} value={s.name} onChange={(e) => onChange({ name: e.target.value })} /></div>
           <div className="space-y-1.5"><Label htmlFor={`o-${s.key}`}>Objective</Label><Input id={`o-${s.key}`} value={s.objective} onChange={(e) => onChange({ objective: e.target.value })} placeholder="Validate hands-on ownership and technical depth" /></div>
           <div className="grid grid-cols-2 gap-3 md:col-span-2 md:grid-cols-4">
             <NumberField id={`d-${s.key}`} label="Duration (min)" value={s.duration_minutes} min={1} max={60} onChange={(n) => onChange({ duration_minutes: n })} />
@@ -113,7 +113,7 @@ export function TemplateEditor({ templateId, initial, canWrite }: { templateId?:
   return (
     <div className="space-y-6">
       <div className="grid gap-4 rounded-xl border bg-card p-5 md:grid-cols-3">
-        <div className="space-y-1.5"><Label htmlFor="t-name">Template name</Label><Input id="t-name" value={name} onChange={(e) => setName(e.target.value)} disabled={!canWrite} /></div>
+        <div className="space-y-1.5"><Label htmlFor="t-name" required>Template name</Label><Input id="t-name" value={name} onChange={(e) => setName(e.target.value)} disabled={!canWrite} /></div>
         <div className="space-y-1.5 md:col-span-2"><Label htmlFor="t-desc">Description</Label><Input id="t-desc" value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canWrite} /></div>
       </div>
       <div className="flex items-center justify-between">

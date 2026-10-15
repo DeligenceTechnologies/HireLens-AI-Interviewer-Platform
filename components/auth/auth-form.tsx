@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, ClientApiError } from "@/lib/client/api";
 
-export type Field = { name: string; label: string; type?: string; autoComplete?: string; placeholder?: string; defaultValue?: string; readOnly?: boolean; hint?: string };
+export type Field = { name: string; label: string; type?: string; autoComplete?: string; placeholder?: string; defaultValue?: string; readOnly?: boolean; hint?: string; optional?: boolean };
 
 export function AuthForm({ fields, submitLabel, endpoint, extra, onSuccess }: {
   fields: Field[];
@@ -43,8 +43,8 @@ export function AuthForm({ fields, submitLabel, endpoint, extra, onSuccess }: {
     >
       {fields.map((f) => (
         <div key={f.name} className="space-y-1.5">
-          <Label htmlFor={f.name}>{f.label}</Label>
-          <Input id={f.name} name={f.name} type={f.type ?? "text"} autoComplete={f.autoComplete} placeholder={f.placeholder}
+          <Label htmlFor={f.name} required={!f.optional}>{f.label}{f.optional && <span className="font-normal text-muted-foreground"> (optional)</span>}</Label>
+          <Input id={f.name} name={f.name} required={!f.optional} type={f.type ?? "text"} autoComplete={f.autoComplete} placeholder={f.placeholder}
             defaultValue={f.defaultValue} readOnly={f.readOnly} aria-invalid={!!fieldErrors[f.name]} className="h-10" />
           {fieldErrors[f.name] ? <p className="text-xs text-destructive">{fieldErrors[f.name]}</p> : f.hint && <p className="text-xs text-muted-foreground">{f.hint}</p>}
         </div>

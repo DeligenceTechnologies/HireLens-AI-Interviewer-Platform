@@ -27,9 +27,9 @@ export function OrgSettingsForm({ orgName, settings, canEdit, ai }: { orgName: s
           catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
         }}>{busy && <Loader2 className="animate-spin" />}Save changes</Button>}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5"><Label htmlFor="o-name">Company name</Label><Input id="o-name" value={name} disabled={!canEdit} onChange={(e) => setName(e.target.value)} /></div>
-          <div className="space-y-1.5"><Label htmlFor="o-int">AI interviewer name</Label><Input id="o-int" value={s.interviewer_name} disabled={!canEdit} onChange={(e) => setS({ ...s, interviewer_name: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label htmlFor="o-exp">Invitation link validity (days)</Label><Input id="o-exp" type="number" min={1} max={90} value={s.invite_expiry_days} disabled={!canEdit} onChange={(e) => setS({ ...s, invite_expiry_days: Math.max(1, Math.min(90, Number(e.target.value) || 1)) })} /></div>
+          <div className="space-y-1.5"><Label htmlFor="o-name" required>Company name</Label><Input id="o-name" value={name} disabled={!canEdit} onChange={(e) => setName(e.target.value)} /></div>
+          <div className="space-y-1.5"><Label htmlFor="o-int" required>AI interviewer name</Label><Input id="o-int" value={s.interviewer_name} disabled={!canEdit} onChange={(e) => setS({ ...s, interviewer_name: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label htmlFor="o-exp" required>Invitation link validity (days)</Label><Input id="o-exp" type="number" min={1} max={90} value={s.invite_expiry_days} disabled={!canEdit} onChange={(e) => setS({ ...s, invite_expiry_days: Math.max(1, Math.min(90, Number(e.target.value) || 1)) })} /></div>
         </div>
         <label className="flex items-start gap-3 text-sm"><Switch checked={s.show_scores} disabled={!canEdit} onCheckedChange={(c) => setS({ ...s, show_scores: !!c })} /><span><span className="font-medium">Show 1–5 section scores</span><br /><span className="text-muted-foreground">Only for sections where scoring is enabled in the template. Scores are evidence summaries, never hiring decisions.</span></span></label>
         <label className="flex items-start gap-3 text-sm"><Switch checked={s.notify_on_completion} disabled={!canEdit} onCheckedChange={(c) => setS({ ...s, notify_on_completion: !!c })} /><span><span className="font-medium">Email recruiters when an interview completes</span></span></label>
