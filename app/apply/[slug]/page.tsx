@@ -1,13 +1,25 @@
 import type { Metadata } from "next";
 import { Briefcase, Clock, MapPin } from "lucide-react";
 import { ApplyForm } from "@/components/apply/apply-form";
-import { Copyright, Logo } from "@/components/layout/logo";
+import { BrandMark } from "@/components/branding/brand-mark";
+import { type Brand, brandStyle, logoUrl } from "@/lib/branding";
 import { employmentTypeLabel } from "@/lib/format";
 import { getPublicJob } from "@/lib/services/applications";
 
 export async function generateMetadata(props: PageProps<"/apply/[slug]">): Promise<Metadata> {
   const job = await getPublicJob((await props.params).slug);
-  return job ? { title: `${job.title} — ${job.company_name}`, description: `Apply for ${job.title} at ${job.company_name}.` } : { title: "Job not available" };
+  if (!job) return { title: { absolute: "Job not available" }, icons: { icon: "/neutral-icon.png" } };
+  const brand = brandOf(job);
+  // Candidate pages carry only the hiring company's identity.
+  return {
+    title: { absolute: `${job.title} — ${job.company_name}` },
+    description: `Apply for ${job.title} at ${job.company_name}.`,
+    icons: { icon: brand.logoUrl ?? "/neutral-icon.png" },
+  };
+}
+
+function brandOf(job: NonNullable<Awaited<ReturnType<typeof getPublicJob>>>): Brand {
+  return { name: job.company_name, logoUrl: logoUrl(job.organization_id, job.logo_updated_at, job.logo_path), color: job.brand_color };
 }
 
 export default async function ApplyPage(props: PageProps<"/apply/[slug]">) {
@@ -24,15 +36,15 @@ export default async function ApplyPage(props: PageProps<"/apply/[slug]">) {
       </div>
     );
   }
+  const brand = brandOf(job);
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" style={brandStyle(brand.color)}>
       <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-5">
+        <div className="mx-auto flex max-w-5xl items-center gap-4 px-6 py-5">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{job.company_name}</p>
-            <p className="text-xs text-muted-foreground">Careers</p>
+            <BrandMark brand={brand} height={34} nameClassName="truncate text-sm" />
+            <p className="mt-0.5 text-xs text-muted-foreground">Careers</p>
           </div>
-          <Logo height={22} className="shrink-0" />
         </div>
       </header>
       <main className="mx-auto grid max-w-5xl gap-10 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_420px]">
@@ -64,7 +76,6 @@ export default async function ApplyPage(props: PageProps<"/apply/[slug]">) {
           <ApplyForm slug={slug} company={job.company_name} jobTitle={job.title} />
         </aside>
       </main>
-      <footer className="flex flex-col items-center gap-3 border-t py-8"><Logo height={24} /><Copyright /></footer>
     </div>
   );
 }

@@ -1,14 +1,16 @@
 import { AlertCircle } from "lucide-react";
-import { Copyright, Logo } from "@/components/layout/logo";
+import { BrandMark } from "@/components/branding/brand-mark";
+import { type Brand, brandStyle } from "@/lib/branding";
 
-export function CandidateShell({ company, job, children, step }: { company?: string; job?: string; children: React.ReactNode; step?: number }) {
+/** Candidate pages carry the hiring company's branding only (no platform branding). */
+export function CandidateShell({ brand, job, children, step }: { brand?: Brand; job?: string; children: React.ReactNode; step?: number }) {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col" style={brandStyle(brand?.color ?? null)}>
       <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-          <div>
-            <p className="font-semibold">{company ?? "Interview"}</p>
-            {job && <p className="text-xs text-muted-foreground">{job}</p>}
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
+          <div className="min-w-0">
+            {brand ? <BrandMark brand={brand} height={30} /> : <p className="font-semibold">Interview</p>}
+            {job && <p className="mt-0.5 truncate text-xs text-muted-foreground">{job}</p>}
           </div>
           {step != null && (
             <ol className="flex items-center gap-2 text-xs text-muted-foreground" aria-label="Steps">
@@ -24,9 +26,7 @@ export function CandidateShell({ company, job, children, step }: { company?: str
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">{children}</main>
       <footer className="flex flex-col items-center gap-2 py-6 text-center text-xs text-muted-foreground">
-        <Logo height={22} />
         <span>Your responses are reviewed by the hiring team.</span>
-        <Copyright />
       </footer>
     </div>
   );

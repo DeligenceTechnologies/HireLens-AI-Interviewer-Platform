@@ -51,6 +51,7 @@ export type PublicJob = {
   id: string; organization_id: string; title: string; description: string; location: string | null; employment_type: string | null;
   experience_min: number | null; experience_max: number | null; required_skills: string[]; preferred_skills: string[];
   responsibilities: string[]; company_name: string;
+  logo_path: string | null; logo_updated_at: Date | null; brand_color: string | null;
 };
 
 /** Public job lookup: only active jobs with the apply link switched on. */
@@ -58,7 +59,8 @@ export async function getPublicJob(slug: string): Promise<PublicJob | null> {
   if (!/^[a-z0-9-]{3,80}$/.test(slug)) return null;
   const [job] = await withSystem((tx) => tx<PublicJob[]>`
     select j.id, j.organization_id, j.title, j.description, j.location, j.employment_type, j.experience_min, j.experience_max,
-      j.required_skills, j.preferred_skills, j.responsibilities, o.name as company_name
+      j.required_skills, j.preferred_skills, j.responsibilities, o.name as company_name,
+      o.logo_path, o.logo_updated_at, o.brand_color
     from jobs j join organizations o on o.id = j.organization_id
     where j.apply_slug = ${slug} and j.apply_enabled and j.status = 'active' and o.status = 'active'`);
   return job ?? null;

@@ -7,6 +7,7 @@ import { json, withOrg, withSystem, type Tx } from "@/lib/database/db";
 import { audit, notify } from "@/lib/audit";
 import { ApiError } from "@/lib/api";
 import { analyzeAnswer } from "@/lib/ai/answer-analyzer";
+import { getBrand } from "@/lib/services/branding";
 import { buildTranscriptionPrompt } from "@/prompts/transcription/v1";
 import { analyzeTurn } from "@/lib/ai/answer-turn";
 import { mockAnalyzeAnswer } from "@/lib/ai/mock";
@@ -118,6 +119,7 @@ export async function getPublicInterview(token: string) {
     section_names: ctx.plan?.sections.map((s) => s.name) ?? [],
     progress: progressOf(ctx),
     demo_mode: !aiIsLive(),
+    brand: await getBrand(ctx.orgId),
   };
 }
 

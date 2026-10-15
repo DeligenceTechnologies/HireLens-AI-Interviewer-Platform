@@ -17,17 +17,18 @@ export type Permission =
   | "data:delete"
   | "privacy:manage"
   | "audit:view"
-  | "usage:view";
+  | "usage:view"
+  | "branding:manage";
 
 const MATRIX: Record<Role, Permission[]> = {
   owner: [
     "org:manage", "billing:manage", "team:manage", "job:write", "candidate:view", "candidate:write", "template:write",
     "interview:write", "interview:view", "report:view", "report:regenerate", "recording:view",
-    "data:delete", "privacy:manage", "audit:view", "usage:view",
+    "data:delete", "privacy:manage", "audit:view", "usage:view", "branding:manage",
   ],
   admin: [
     "team:manage", "job:write", "candidate:view", "candidate:write", "template:write", "interview:write", "interview:view",
-    "report:view", "report:regenerate", "recording:view", "data:delete", "privacy:manage", "audit:view", "usage:view",
+    "report:view", "report:regenerate", "recording:view", "data:delete", "privacy:manage", "audit:view", "usage:view", "branding:manage",
   ],
   recruiter: [
     "job:write", "candidate:view", "candidate:write", "template:write", "interview:write", "interview:view", "report:view",

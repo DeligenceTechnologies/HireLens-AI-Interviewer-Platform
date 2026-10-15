@@ -9,6 +9,7 @@ export default async function SettingsLayout({ children }: LayoutProps<"/setting
     { href: "/settings/profile", label: "Profile" },
     { href: "/settings/team", label: "Team" },
     { href: "/settings/interview", label: "Interview" },
+    ...(can(auth.role, "branding:manage") ? [{ href: "/settings/branding", label: "Branding" }] : []),
     ...(can(auth.role, "privacy:manage") ? [{ href: "/settings/privacy", label: "Privacy & data" }] : []),
     ...(can(auth.role, "usage:view") ? [{ href: "/settings/usage", label: "Usage" }] : []),
     ...(can(auth.role, "audit:view") ? [{ href: "/settings/audit", label: "Audit log" }] : []),

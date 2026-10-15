@@ -20,6 +20,7 @@ const LABEL: Record<string, string> = {
   "company.member_role_changed": "Changed member role",
   "company.member_removed": "Removed member",
   "company.member_invite_revoked": "Revoked member invitation",
+  "company.branding_updated": "Updated company branding",
   "company.ownership_transferred": "Transferred ownership",
   "user.disabled": "Disabled user",
   "user.enabled": "Enabled user",

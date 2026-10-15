@@ -15,6 +15,6 @@ export default async function SessionPage(props: PageProps<"/interview/[token]/s
   }
   return (
     <InterviewSession token={token} company={data.company_name} job={data.job_title} interviewerName={data.interviewer_name}
-      demoMode={data.demo_mode} candidateName={data.candidate_first_name} />
+      demoMode={data.demo_mode} candidateName={data.candidate_first_name} brand={data.brand} />
   );
 }

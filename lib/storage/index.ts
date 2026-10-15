@@ -26,4 +26,5 @@ export const paths = {
   recordingChunkPrefix: (orgId: string, interviewId: string, part: number) => `${orgId}/interviews/${interviewId}/recording/part-${part}/`,
   recordingFile: (orgId: string, interviewId: string, part: number) => `${orgId}/interviews/${interviewId}/recording/part-${part}.webm`,
   interviewPrefix: (orgId: string, interviewId: string) => `${orgId}/interviews/${interviewId}/`,
+  logo: (orgId: string, version: number, ext: string) => `${orgId}/branding/logo-${version}.${ext}`,
 };

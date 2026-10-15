@@ -13,7 +13,7 @@ export default async function WelcomePage(props: PageProps<"/interview/[token]">
   if (step === "completed") redirect(`/interview/${token}/completed`);
   if (step === "session") redirect(`/interview/${token}/session`);
   return (
-    <CandidateShell company={data.company_name} job={data.job_title} step={0}>
+    <CandidateShell brand={data.brand} job={data.job_title} step={0}>
       <h1 className="text-3xl font-semibold tracking-tight">Hi {data.candidate_first_name}, welcome.</h1>
       <p className="mt-3 text-muted-foreground">
         {data.company_name} has invited you to an AI-assisted interview for the <strong className="text-foreground">{data.job_title}</strong> role.

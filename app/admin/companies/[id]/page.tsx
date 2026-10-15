@@ -6,6 +6,8 @@ import { FormCard } from "@/components/settings/form-card";
 import { formatDate } from "@/lib/format";
 import { isUuid } from "@/lib/ids";
 import { getCompany } from "@/lib/services/admin";
+import { getBrand } from "@/lib/services/branding";
+import { BrandingManager } from "@/components/branding/branding-manager";
 
 export const metadata = { title: "Company" };
 
@@ -20,6 +22,7 @@ export default async function CompanyPage(props: PageProps<"/admin/companies/[id
   if (!isUuid(id)) notFound();
   const company = await getCompany(id);
   if (!company) notFound();
+  const brand = await getBrand(id);
   const data = JSON.parse(JSON.stringify(company)) as CompanyData;
   const { usage } = company;
   return (
@@ -36,6 +39,7 @@ export default async function CompanyPage(props: PageProps<"/admin/companies/[id
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-6">
           <MembersCard id={id} members={data.members} invites={data.invites} />
+          <BrandingManager endpoint={`/api/admin/companies/${id}/branding`} initial={brand} />
           <FormCard title="Usage" description="Counts only. Candidate videos, transcripts and resumes stay private to the company.">
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-4">
               {[

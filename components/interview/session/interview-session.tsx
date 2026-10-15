@@ -6,7 +6,8 @@ import { AlertTriangle, Captions, CheckCircle2, CloudUpload, Keyboard, Loader2, 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
-import { Logo } from "@/components/layout/logo";
+import { BrandMark } from "@/components/branding/brand-mark";
+import { type Brand, brandStyle } from "@/lib/branding";
 import { formatClock } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { InterviewRecorder, type UploadStatus } from "./recorder";
@@ -51,8 +52,8 @@ async function post<T>(url: string, body: unknown, opts: { retries?: number; onR
   }
 }
 
-export function InterviewSession({ token, company, job, interviewerName, demoMode, candidateName }: {
-  token: string; company: string; job: string; interviewerName: string; demoMode: boolean; candidateName: string;
+export function InterviewSession({ token, company, job, interviewerName, demoMode, candidateName, brand }: {
+  token: string; company: string; job: string; interviewerName: string; demoMode: boolean; candidateName: string; brand: Brand;
 }) {
   const router = useRouter();
   const [stage, setStage] = useState<"intro" | "starting" | "live" | "finishing" | "error">("intro");
@@ -423,7 +424,8 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
 
   if (stage === "intro" || stage === "error") {
     return (
-      <div className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center px-6 text-center">
+      <div className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center px-6 text-center" style={brandStyle(brand.color)}>
+        {brand.logoUrl && <BrandMark brand={brand} height={40} className="mb-6" />}
         <p className="text-sm font-medium text-muted-foreground">{company} · {job}</p>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">{stage === "error" ? "The interview was interrupted" : `Ready when you are, ${candidateName}`}</h1>
         <p className="mt-3 text-muted-foreground">
@@ -431,16 +433,19 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
         </p>
         {demoMode && stage !== "error" && <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-300">Demo mode: the interviewer uses your browser&apos;s voice and you type answers.</p>}
         <Button size="lg" className="mt-8 h-11 px-8" onClick={begin}>{stage === "error" ? "Try again" : "Start interview"}</Button>
-        <Logo height={20} className="mt-12 opacity-80" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100">
+    <div className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100" style={brandStyle(brand.color)}>
       <header className="flex items-center gap-4 border-b border-white/10 px-5 py-3">
-        <Logo variant="light" height={18} className="hidden shrink-0 md:block" />
-        <span className="hidden h-6 w-px bg-white/15 md:block" aria-hidden />
+        {brand.logoUrl && (
+          <>
+            <BrandMark brand={brand} height={22} onDark className="hidden shrink-0 md:inline-flex" />
+            <span className="hidden h-6 w-px bg-white/15 md:block" aria-hidden />
+          </>
+        )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{company}</p>
           <p className="truncate text-xs text-zinc-400">{job}</p>
@@ -539,7 +544,7 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
         <div className="ml-auto flex items-center gap-2">
           <Button variant="ghost" size="sm" className="text-zinc-300 hover:bg-white/10 hover:text-white" onClick={() => setCaptions(!captions)} aria-pressed={captions}><Captions /> Captions</Button>
           {!demoMode && <Button variant="ghost" size="sm" className="text-zinc-300 hover:bg-white/10 hover:text-white" onClick={() => setTyping(!typing)} aria-pressed={typing}><Keyboard /> Type</Button>}
-          <Button size="sm" disabled={!listening || saving} onClick={doneAnswering} className="bg-indigo-500 text-white hover:bg-indigo-400">
+          <Button size="sm" disabled={!listening || saving} onClick={doneAnswering} className={brand.color ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-indigo-500 text-white hover:bg-indigo-400"}>
             {saving && <Loader2 className="animate-spin" />}{saving ? "Saving answer…" : "Done answering"}
           </Button>
           <ConfirmDialog

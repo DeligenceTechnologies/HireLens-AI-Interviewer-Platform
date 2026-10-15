@@ -8,7 +8,7 @@ export default async function CompletedPage(props: PageProps<"/interview/[token]
   const { data, error } = await loadPublicInterview(token);
   if (!data) return <CandidateError message={error} />;
   return (
-    <CandidateShell company={data.company_name} job={data.job_title}>
+    <CandidateShell brand={data.brand} job={data.job_title}>
       <div className="mx-auto max-w-lg py-10 text-center">
         <CheckCircle2 className="mx-auto size-12 text-emerald-600" />
         <h1 className="mt-6 text-2xl font-semibold tracking-tight">Thank you, {data.candidate_first_name}!</h1>
