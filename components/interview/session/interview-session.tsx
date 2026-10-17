@@ -33,6 +33,9 @@ const COUNTDOWN_MS = 5_000;
 const ACKS = ["Thank you.", "Thanks for sharing that.", "Got it, thank you."];
 const NUDGE = "Take your time. Would you like me to repeat the question? Or select Done answering to move on.";
 type Trigger = "button" | "silence" | "no_answer_timeout";
+const AUDIO: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+/** Longest the candidate waits on the "saving" screen; the server seals anything still missing. */
+const SAVE_WAIT_MS = 30_000;
 
 async function post<T>(url: string, body: unknown, opts: { retries?: number; onRetry?: (n: number) => void } = {}): Promise<T> {
   const retries = opts.retries ?? 4;
@@ -73,11 +76,14 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
   const [nudged, setNudged] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [micNotice, setMicNotice] = useState<string | null>(null);
+  const [endedBy, setEndedBy] = useState<"finished" | "candidate_ended" | "time_limit">("finished");
 
   const video = useRef<HTMLVideoElement>(null);
   const camera = useRef<MediaStream | null>(null);
   const engine = useRef<VoiceEngine | null>(null);
   const recorder = useRef<InterviewRecorder | null>(null);
+  const voiceRecorder = useRef<InterviewRecorder | null>(null);
   const clockBase = useRef<{ startedAt: number; skew: number } | null>(null);
   const current = useRef<Utterance | null>(null);
   const aiRef = useRef<AIState>("idle");
@@ -94,7 +100,14 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
   const ackIndex = useRef(0);
   const finishing = useRef(false);
   const submitting = useRef(false);
+  const meterCtx = useRef<AudioContext | null>(null);
+  const switchingMic = useRef(false);
+  const switchMicRef = useRef<(reason: string) => Promise<void>>(async () => {});
   const events = useRef<{ event_id: string; type: string; payload?: Record<string, string | number | boolean | null> }[]>([]);
+
+  const watchMic = (stream: MediaStream) => {
+    stream.getAudioTracks().forEach((t) => t.addEventListener("ended", () => void switchMicRef.current("mic_disconnected"), { once: true }));
+  };
 
   const clock = useCallback(() => {
     const b = clockBase.current;
@@ -125,7 +138,7 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
   }, [clock]);
 
   useEffect(() => {
-    const warn = (e: BeforeUnloadEvent) => { if (stage === "live") { e.preventDefault(); } };
+    const warn = (e: BeforeUnloadEvent) => { if (stage === "live" || stage === "finishing") { e.preventDefault(); } };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [stage]);
@@ -134,6 +147,17 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
     engine.current?.close();
     camera.current?.getTracks().forEach((t) => t.stop());
   }, []);
+
+  // The interviewer's voice is recorded on its own (not mixed into the video) and
+  // played in sync on review. A reconnect brings a new stream: keep recording it.
+  const recordVoice = (stream: MediaStream) => {
+    const audio = new MediaStream(stream.getAudioTracks());
+    if (finishing.current || !clockBase.current || !audio.getAudioTracks().length) return;
+    if (voiceRecorder.current) { void voiceRecorder.current.useStream(audio); return; }
+    const r = new InterviewRecorder(token, () => {}, { clock, onEvent: logEvent, track: "interviewer" });
+    voiceRecorder.current = r;
+    r.start(audio).catch(() => { voiceRecorder.current = null; logEvent("voice_recording_start_failed"); });
+  };
 
   const saveSegment = useCallback((seg: { client_event_id: string; speaker: "interviewer" | "candidate"; text: string; start_ms: number; end_ms: number; question_id: string | null }) => {
     void post(`/api/public/interview/${token}/transcript`, { segments: [seg] }, { retries: 6 }).catch(() => logEvent("transcript_save_failed"));
@@ -156,12 +180,14 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
   const finish = useCallback(async (reason: "finished" | "candidate_ended" | "time_limit") => {
     if (finishing.current) return;
     finishing.current = true;
+    setEndedBy(reason);
     setStage("finishing");
     setAiState("finishing");
     engine.current?.close();
     // Never keep the candidate waiting indefinitely; the server seals any
     // chunks that arrived even if this final save times out.
-    await Promise.race([recorder.current?.finish().catch(() => false), new Promise((r) => setTimeout(r, 45_000))]);
+    const saves = [recorder.current, voiceRecorder.current].map((r) => r?.finish().catch(() => false));
+    await Promise.race([Promise.all(saves), new Promise((r) => setTimeout(r, SAVE_WAIT_MS))]);
     try {
       await post(`/api/public/interview/${token}/complete`, { reason }, { retries: 8 });
     } catch { /* the server also finalizes abandoned interviews */ }
@@ -353,7 +379,7 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
       if (s === "connected") setConnection("connected");
       else if (!finishing.current) void reconnect();
     },
-    onRemoteStream: (stream) => recorder.current?.addAudio(stream),
+    onRemoteStream: (stream) => recordVoice(stream),
     onEvent: logEvent,
   };
   });
@@ -365,9 +391,10 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
     try {
       const media = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 854 }, height: { ideal: 480 }, frameRate: { ideal: 24 } },
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        audio: AUDIO,
       });
       camera.current = media;
+      watchMic(media);
       if (video.current) video.current.srcObject = media;
       startMicMeter(media);
 
@@ -377,8 +404,8 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
       setProgress(start.progress);
       logEvent(start.resumed ? "session_resumed_client" : "session_started_client", { engine: demoMode ? "browser" : "openai" });
 
-      recorder.current = new InterviewRecorder(token, setUpload);
-      await recorder.current.start(media, clock()).catch(() => {
+      recorder.current = new InterviewRecorder(token, setUpload, { clock, onEvent: logEvent });
+      await recorder.current.start(media).catch(() => {
         setUpload({ state: "failed", pending: 0, uploaded: 0 });
         logEvent("recording_start_failed");
       });
@@ -397,7 +424,9 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
   };
 
   const startMicMeter = (stream: MediaStream) => {
+    meterCtx.current?.close().catch(() => {});
     const ctx = new AudioContext();
+    meterCtx.current = ctx;
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 256;
     ctx.createMediaStreamSource(stream).connect(analyser);
@@ -412,6 +441,50 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
     };
     tick();
   };
+
+  // The microphone was unplugged or disconnected (e.g. earphones pulled out, a
+  // headset's battery died): carry on with the next available microphone for
+  // both the recording and the interviewer.
+  const switchMic = async (reason: string) => {
+    const cam = camera.current;
+    if (!cam || switchingMic.current || finishing.current) return;
+    switchingMic.current = true;
+    try {
+      const fresh = (await navigator.mediaDevices.getUserMedia({ audio: AUDIO })).getAudioTracks()[0];
+      cam.getAudioTracks().forEach((t) => { cam.removeTrack(t); t.stop(); });
+      cam.addTrack(fresh);
+      watchMic(cam);
+      startMicMeter(cam);
+      await engine.current?.replaceMic?.(fresh);
+      await recorder.current?.useStream(cam);
+      logEvent("mic_switched", { reason });
+      setMicNotice(`Microphone switched to: ${fresh.label || "your default microphone"}`);
+    } catch {
+      logEvent("mic_switch_failed", { reason });
+      setMicNotice("We can't find a microphone. Please check it's connected.");
+    } finally {
+      switchingMic.current = false;
+    }
+  };
+  useLayoutEffect(() => { switchMicRef.current = switchMic; });
+
+  useEffect(() => {
+    if (stage !== "live" || !navigator.mediaDevices) return;
+    const onChange = async () => {
+      const track = camera.current?.getAudioTracks()[0];
+      const id = track?.getSettings().deviceId;
+      const inputs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput");
+      if (!track || track.readyState === "ended" || (id && !inputs.some((d) => d.deviceId === id))) void switchMicRef.current("device_removed");
+    };
+    navigator.mediaDevices.addEventListener("devicechange", onChange);
+    return () => navigator.mediaDevices.removeEventListener("devicechange", onChange);
+  }, [stage]);
+
+  useEffect(() => {
+    if (!micNotice) return;
+    const t = setTimeout(() => setMicNotice(null), 8000);
+    return () => clearTimeout(t);
+  }, [micNotice]);
 
   const doneAnswering = async () => {
     if (aiRef.current !== "listening") return;
@@ -466,6 +539,14 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
           <Loader2 className="size-4 animate-spin" /> Your connection was interrupted. We&apos;re reconnecting… your progress is saved.
         </div>
       )}
+
+      {micNotice && (
+        <div className="flex items-center justify-center gap-2 bg-sky-500/15 px-4 py-2 text-sm text-sky-100" role="status">
+          <Mic className="size-4" /> {micNotice}
+        </div>
+      )}
+
+      {stage === "finishing" && <SavingOverlay endedBy={endedBy} upload={upload} />}
 
       <main className="grid flex-1 gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:p-6">
         <div className="relative overflow-hidden rounded-2xl bg-black">
@@ -522,9 +603,6 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
             </p>
           )}
 
-          {stage === "finishing" && (
-            <div className="flex items-center gap-2 rounded-xl bg-white/5 px-4 py-3 text-sm text-zinc-300"><Loader2 className="size-4 animate-spin" /> Saving your recording ({upload.pending} part{upload.pending === 1 ? "" : "s"} left)…</div>
-          )}
         </aside>
       </main>
 
@@ -541,7 +619,7 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
           {upload.state === "failed" ? <AlertTriangle className="size-4 text-amber-400" /> : upload.state === "saved" ? <CheckCircle2 className="size-4 text-emerald-400" /> : <CloudUpload className={cn("size-4", upload.state === "retrying" ? "text-amber-400" : "text-zinc-400")} />}
           {upload.state === "retrying" ? "Recording upload retrying" : upload.state === "failed" ? "Recording issue" : upload.pending > 1 ? `Uploading (${upload.pending})` : "Recording synced"}
         </span>
-        <div className="ml-auto flex items-center gap-2">
+        {stage === "live" && <div className="ml-auto flex items-center gap-2">
           <Button variant="ghost" size="sm" className="text-zinc-300 hover:bg-white/10 hover:text-white" onClick={() => setCaptions(!captions)} aria-pressed={captions}><Captions /> Captions</Button>
           {!demoMode && <Button variant="ghost" size="sm" className="text-zinc-300 hover:bg-white/10 hover:text-white" onClick={() => setTyping(!typing)} aria-pressed={typing}><Keyboard /> Type</Button>}
           <Button size="sm" disabled={!listening || saving} onClick={doneAnswering} className={brand.color ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-indigo-500 text-white hover:bg-indigo-400"}>
@@ -553,10 +631,29 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
             confirmLabel="End interview"
             destructive
             onConfirm={() => finish("candidate_ended")}
-            trigger={(open) => <Button size="sm" variant="destructive" disabled={stage === "finishing"} onClick={open}><PhoneOff /> End</Button>}
+            trigger={(open) => <Button size="sm" variant="destructive" onClick={open}><PhoneOff /> End</Button>}
           />
-        </div>
+        </div>}
       </footer>
+    </div>
+  );
+}
+
+/** Shown once the interview is over while the last of the recording uploads. */
+function SavingOverlay({ endedBy, upload }: { endedBy: "finished" | "candidate_ended" | "time_limit"; upload: UploadStatus }) {
+  const total = upload.uploaded + upload.pending;
+  const pct = upload.state === "saved" || upload.state === "failed" || total === 0 ? 100 : Math.min(99, Math.round((upload.uploaded / total) * 100));
+  return (
+    <div role="status" aria-live="polite" className="fixed inset-0 z-40 flex items-center justify-center bg-zinc-950/90 p-6 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-2xl bg-zinc-900 p-6 text-center ring-1 ring-white/10">
+        <CheckCircle2 className="mx-auto size-10 text-emerald-400" />
+        <h2 className="mt-3 text-lg font-semibold text-white">{endedBy === "candidate_ended" ? "Interview ended" : "Interview complete"}</h2>
+        <p className="mt-1 text-sm text-zinc-400">Saving your video. Please keep this tab open, it usually takes a few seconds.</p>
+        <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10" aria-hidden>
+          <div className="h-full rounded-full bg-emerald-400 transition-[width] duration-300" style={{ width: `${pct}%` }} />
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">{pct}% saved</p>
+      </div>
     </div>
   );
 }

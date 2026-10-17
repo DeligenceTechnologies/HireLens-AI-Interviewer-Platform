@@ -60,13 +60,19 @@ test("recruiter to candidate to report", async ({ page, browser }) => {
   await cand.evaluate(async () => {
     try { await Promise.race([navigator.mediaDevices.getUserMedia({ audio: true, video: true }), new Promise((r) => setTimeout(r, 5000))]); } catch { /* ignore */ }
   });
-  await expect(cand.getByText("We can hear you")).toBeVisible({ timeout: 30_000 });
+  await expect(cand.getByText(/We can hear you/)).toBeVisible({ timeout: 30_000 });
+  await expect(cand.getByText("Test recording worked")).toBeVisible({ timeout: 20_000 });
   if (process.env.E2E_SCREENSHOTS) await cand.screenshot({ path: "test-results/device-check.png" });
   await cand.getByRole("button", { name: "I heard it" }).click();
   await expect(cand.getByText(/being prepared/)).toBeHidden({ timeout: 60_000 });
   await cand.getByRole("button", { name: "Continue to interview" }).click();
   await expect(cand).toHaveURL(/session/);
   await cand.getByRole("button", { name: "Start interview" }).click();
+  // After the closing line the candidate is told the interview is over while the video saves.
+  const sawSavingScreen = cand.getByText("Interview complete").waitFor({ timeout: 200_000 }).then(async () => {
+    if (process.env.E2E_SCREENSHOTS) await cand.screenshot({ path: "test-results/saving-screen.png" }).catch(() => {});
+    return true;
+  }, () => false);
 
   for (let turn = 0; turn < 25; turn++) {
     const answer = cand.locator("#typed");
@@ -85,12 +91,24 @@ test("recruiter to candidate to report", async ({ page, browser }) => {
       await expect(cand.getByText(question!, { exact: true })).toBeHidden({ timeout: 30_000 });
       continue;
     }
+    if (turn === 3) {
+      // The microphone disconnects mid-interview: the session carries on with another one.
+      await cand.evaluate(() => {
+        const cam = [...document.querySelectorAll("video")].map((v) => v.srcObject).find((s): s is MediaStream => s instanceof MediaStream)!;
+        const mic = cam.getAudioTracks()[0];
+        mic.stop();
+        mic.dispatchEvent(new Event("ended"));
+      });
+      await expect(cand.getByText(/Microphone switched to/)).toBeVisible({ timeout: 20_000 });
+      if (process.env.E2E_SCREENSHOTS) await cand.screenshot({ path: "test-results/mic-switched.png" });
+    }
     await answer.fill(LONG_ANSWER);
     await cand.getByRole("button", { name: "Done answering" }).click();
     await expect(answer).toBeHidden();
   }
   await expect(cand).toHaveURL(/completed/, { timeout: 120_000 });
   await expect(cand.getByRole("heading", { name: /Thank you/ })).toBeVisible();
+  expect(await sawSavingScreen).toBe(true);
   await ctx.close();
 
   // 5. Recruiter reviews transcript and report
@@ -104,7 +122,9 @@ test("recruiter to candidate to report", async ({ page, browser }) => {
   // Recording is stored and streams with Range support (needed for seeking).
   const interviewId = page.url().match(/interviews\/([0-9a-f-]{36})/)![1];
   const rec = await (await page.request.get(`/api/interviews/${interviewId}/recording`)).json();
-  expect(rec.parts.length).toBeGreaterThan(0);
+  // The microphone switch continued the recording as a second part; both are stored.
+  expect(rec.parts.length).toBeGreaterThanOrEqual(2);
+  for (const part of rec.parts) expect((await page.request.get(part.url, { headers: { Range: "bytes=0-3" } })).status()).toBe(206);
   const head = await page.request.get(rec.parts[0].url, { headers: { Range: "bytes=0-3" } });
   expect(head.status()).toBe(206);
   expect(Buffer.from(await head.body()).toString("hex")).toBe("1a45dfa3"); // WebM/EBML magic

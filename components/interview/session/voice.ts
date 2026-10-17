@@ -30,6 +30,8 @@ export interface VoiceEngine {
    */
   flush(timeoutMs?: number): Promise<{ timedOut: boolean }>;
   stopListening(): void;
+  /** Use a different microphone (e.g. the headset was unplugged) without reconnecting. */
+  replaceMic?(track: MediaStreamTrack): Promise<void>;
   close(): void;
 }
 
@@ -244,6 +246,15 @@ export class RealtimeVoice implements VoiceEngine {
     this.mic.enabled = false;
     this.openSpeechStart = null;
     this.send({ type: "input_audio_buffer.clear" });
+  }
+
+  async replaceMic(track: MediaStreamTrack) {
+    const next = track.clone();
+    next.enabled = this.mic.enabled;
+    const sender = this.pc?.getSenders().find((s) => s.track === this.mic || s.track?.kind === "audio");
+    await sender?.replaceTrack(next);
+    this.mic.stop();
+    this.mic = next;
   }
 
   close() {

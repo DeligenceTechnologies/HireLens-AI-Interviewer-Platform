@@ -392,7 +392,7 @@ export async function submitAnswer(token: string, input: {
       next.pending_utterance = {
         question_id: null,
         kind: "closing",
-        text: `${transition ? transition + " " : ""}That brings us to the end of the interview. Thank you for your time, ${first}. The hiring team at ${ctx.companyName} will review your interview and be in touch about next steps. You can now end the session.`,
+        text: `${transition ? transition + " " : ""}That brings us to the end of the interview. Thank you for your time, ${first}. The hiring team at ${ctx.companyName} will review your interview and be in touch about next steps. Please keep this window open for a few seconds while your interview is saved.`,
       };
       await tx`update interviews set status = 'completing' where id = ${ctx.id}`;
     } else if (step.action === "follow_up") {

@@ -2,11 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Camera, CheckCircle2, Globe, Loader2, Mic, Volume2, Wifi, XCircle } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, Clapperboard, Globe, Loader2, Mic, Volume2, Wifi, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/client/api";
+import { isWirelessMic, recordingProblem } from "@/components/interview/session/recording-health";
 
-type Status = "pending" | "ok" | "fail";
+type Status = "pending" | "ok" | "fail" | "warn";
 
 function Row({ icon: Icon, label, status, detail, action }: { icon: typeof Camera; label: string; status: Status; detail: string; action?: React.ReactNode }) {
   return (
@@ -14,7 +15,7 @@ function Row({ icon: Icon, label, status, detail, action }: { icon: typeof Camer
       <Icon className="size-5 text-muted-foreground" />
       <div className="min-w-0 flex-1"><p className="text-sm font-medium">{label}</p><p className="text-xs text-muted-foreground">{detail}</p></div>
       {action}
-      {status === "ok" ? <CheckCircle2 className="size-5 text-emerald-600" /> : status === "fail" ? <XCircle className="size-5 text-destructive" /> : <Loader2 className="size-5 animate-spin text-muted-foreground" />}
+      {status === "ok" ? <CheckCircle2 className="size-5 text-emerald-600" /> : status === "warn" ? <AlertTriangle className="size-5 text-amber-500" /> : status === "fail" ? <XCircle className="size-5 text-destructive" /> : <Loader2 className="size-5 animate-spin text-muted-foreground" />}
     </div>
   );
 }
@@ -33,6 +34,8 @@ export function DeviceCheck({ token, planReady }: { token: string; planReady: bo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const heardVoice = useRef(false);
+  const [micName, setMicName] = useState("");
+  const [recTest, setRecTest] = useState<Status>("pending");
 
   useEffect(() => {
     const supported = typeof window !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined" && typeof RTCPeerConnection !== "undefined" && typeof AudioContext !== "undefined";
@@ -43,11 +46,14 @@ export function DeviceCheck({ token, planReady }: { token: string; planReady: bo
     let ctx: AudioContext | null = null;
     let raf = 0;
     let local: MediaStream | null = null;
+    let stopTest = () => {};
     navigator.mediaDevices?.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: { echoCancellation: true, noiseSuppression: true } })
       .then((s) => {
         local = s;
         setStream(s);
         setCam(s.getVideoTracks().length ? "ok" : "fail");
+        setMicName(s.getAudioTracks()[0]?.label ?? "");
+        stopTest = testRecording(s, setRecTest);
         ctx = new AudioContext();
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 512;
@@ -69,10 +75,17 @@ export function DeviceCheck({ token, planReady }: { token: string; planReady: bo
         setMic("fail");
         setMediaError(e.name === "NotAllowedError" ? "Camera/microphone permission was blocked. Allow access in your browser's address bar, then reload." : e.name === "NotFoundError" ? "No camera or microphone was found." : "We couldn't access your camera or microphone.");
       });
-    return () => { cancelAnimationFrame(raf); ctx?.close().catch(() => {}); local?.getTracks().forEach((t) => t.stop()); };
+    return () => { stopTest(); cancelAnimationFrame(raf); ctx?.close().catch(() => {}); local?.getTracks().forEach((t) => t.stop()); };
   }, [token]);
 
   useEffect(() => { if (video.current && stream) video.current.srcObject = stream; }, [stream]);
+
+  // The personalized plan is prepared in the background: re-check until it's ready.
+  useEffect(() => {
+    if (planReady) return;
+    const t = setInterval(() => router.refresh(), 4000);
+    return () => clearInterval(t);
+  }, [planReady, router]);
 
   const playTone = () => {
     const ctx = new AudioContext();
@@ -109,11 +122,18 @@ export function DeviceCheck({ token, planReady }: { token: string; planReady: bo
         <div className="divide-y rounded-xl border bg-card px-4">
           <Row icon={Globe} label="Browser" status={browser} detail={browser === "fail" ? "Please use the latest Chrome, Edge, Firefox or Safari on a computer." : "Supported"} />
           <Row icon={Camera} label="Camera" status={cam} detail={cam === "ok" ? "Working" : cam === "fail" ? "Not available" : "Requesting access…"} />
-          <Row icon={Mic} label="Microphone" status={mic} detail={mic === "ok" ? "We can hear you" : mic === "fail" ? "Not available" : "Say a few words to test"} />
+          <Row icon={Mic} label="Microphone" status={mic} detail={mic === "ok" ? `We can hear you${micName ? ` · ${micName}` : ""}` : mic === "fail" ? "Not available" : "Say a few words to test"} />
           <Row icon={Volume2} label="Speakers" status={speaker} detail={speaker === "ok" ? "Confirmed" : "Play a sound and confirm you heard it"}
             action={speaker !== "ok" && <div className="flex gap-1"><Button size="sm" variant="outline" onClick={playTone}>Play</Button><Button size="sm" variant="outline" onClick={() => setSpeaker("ok")}>I heard it</Button></div>} />
+          <Row icon={Clapperboard} label="Recording" status={recTest}
+            detail={recTest === "ok" ? "Test recording worked" : recTest === "warn" ? "Your computer struggled to record. Close other apps (especially video calls) and reload this page." : recTest === "fail" ? "Recording isn't supported in this browser" : "Making a 5-second test recording…"} />
           <Row icon={Wifi} label="Connection" status={network.s} detail={network.s === "ok" ? `Connected (${network.ms} ms)` : network.s === "fail" ? "Connection problem — check your network" : "Testing…"} />
         </div>
+        {isWirelessMic(micName) && (
+          <p className="mt-4 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900 dark:bg-sky-950 dark:text-sky-100">
+            You&apos;re using a wireless headset ({micName}). That works, but wired earphones or your computer&apos;s built-in microphone usually give clearer audio.
+          </p>
+        )}
         {!planReady && <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Your personalized interview is being prepared…</p>}
         {error && <p role="alert" className="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
         <Button size="lg" className="mt-6 h-11 w-full" disabled={!ready || busy} onClick={async () => {
@@ -129,4 +149,30 @@ export function DeviceCheck({ token, planReady }: { token: string; planReady: bo
       </div>
     </div>
   );
+}
+
+/**
+ * Record a few seconds and check the recorder keeps up with real time (the
+ * same check the interview uses). Advice only: it never blocks the candidate.
+ */
+function testRecording(stream: MediaStream, done: (s: Status) => void) {
+  if (typeof MediaRecorder === "undefined") { done("fail"); return () => {}; }
+  let rec: MediaRecorder;
+  try {
+    rec = new MediaRecorder(new MediaStream(stream.getTracks()));
+  } catch {
+    done("fail");
+    return () => {};
+  }
+  const sliceMs = 1000;
+  const startedAt = performance.now();
+  const chunkTimes: number[] = [];
+  rec.ondataavailable = () => chunkTimes.push(performance.now());
+  rec.onstop = () => {
+    const problem = recordingProblem({ startedAt, chunkTimes, now: performance.now(), sliceMs });
+    done(problem || chunkTimes.length < 4 ? "warn" : "ok");
+  };
+  rec.start(sliceMs);
+  const t = setTimeout(() => rec.state !== "inactive" && rec.stop(), 5500);
+  return () => { clearTimeout(t); rec.onstop = null; if (rec.state !== "inactive") rec.stop(); };
 }
