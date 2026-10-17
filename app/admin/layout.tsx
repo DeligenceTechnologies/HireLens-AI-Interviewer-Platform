@@ -6,7 +6,7 @@ import { Logo } from "@/components/layout/logo";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { withSystem } from "@/lib/database/db";
 
-export const metadata = { title: { default: "Platform admin", template: "%s · Admin · DeliberateHire AI" } };
+export const metadata = { title: { default: "Platform admin", template: "%s · Admin · PickMyHire.ai" } };
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const admin = await requirePlatformAdmin();
@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
     <div className="flex min-h-screen flex-col lg:flex-row">
       <aside className="border-b bg-sidebar px-3 py-3 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-60 lg:shrink-0 lg:flex-col lg:border-r lg:border-b-0 lg:py-4">
         <div className="mb-3 flex items-center justify-between gap-2 px-2 lg:mb-6 lg:block">
-          <Link href="/admin"><Logo height={22} /></Link>
+          <Link href="/admin"><Logo height={28} /></Link>
           <div className="flex items-center gap-2 lg:mt-3">
             <p className="flex items-center gap-1.5 text-xs font-semibold text-primary"><ShieldCheck className="size-3.5" /> Platform admin</p>
             <div className="lg:hidden"><SignOutButton /></div>

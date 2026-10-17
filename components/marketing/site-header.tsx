@@ -22,8 +22,8 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-[#E3EAF5]/80 bg-[#F8FAFD]/90 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:gap-6 sm:px-8">
-        <Link href="/" aria-label="DeliberateHire AI home" className="shrink-0">
-          <Logo height={20} className="sm:h-6!" />
+        <Link href="/" aria-label="PickMyHire.ai home" className="shrink-0">
+          <Logo height={26} className="sm:h-8!" />
         </Link>
         <nav className="hidden flex-1 items-center justify-center gap-6 text-sm font-medium whitespace-nowrap xl:gap-7 text-[#3D4D6A] lg:flex" aria-label="Main">
           {NAV.map((n) => <a key={n.href} href={n.href} className="hover:text-[#0B5BD3]">{n.label}</a>)}

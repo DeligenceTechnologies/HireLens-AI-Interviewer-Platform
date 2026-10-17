@@ -13,7 +13,7 @@ export default async function AdminOverviewPage() {
   const { totals, month, outOfQuota, recentCompanies, recentIssues } = await getOverview();
   return (
     <>
-      <PageHeader title="Platform overview" description="All companies on DeliberateHire AI." />
+      <PageHeader title="Platform overview" description="All companies on PickMyHire.ai." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Companies" value={totals.companies} hint={`${totals.active} active · ${totals.suspended} suspended`} icon={Building2} />
         <StatCard label="Users" value={totals.users} icon={Users} />

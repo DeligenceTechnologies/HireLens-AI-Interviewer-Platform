@@ -25,7 +25,7 @@ export default async function SignupPage(props: PageProps<"/signup">) {
       <p className="mt-1 mb-8 text-sm text-muted-foreground">
         {invite ? `You've been invited as ${invite.role}.`
           : company ? "Your access has been approved. Create your account to get started."
-          : "DeliberateHire AI is available by approval. Enter the access code you received from our team."}
+          : "PickMyHire.ai is available by approval. Enter the access code you received from our team."}
       </p>
       {linkBroken ? (
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">

@@ -91,7 +91,7 @@ export function AccessRequestForm() {
       <button type="submit" disabled={busy} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0B5BD3] text-base font-semibold text-white hover:bg-[#0A4FB8] disabled:opacity-60">
         {busy && <Loader2 className="size-4 animate-spin" />} Request access
       </button>
-      <p className="text-center text-xs text-[#8A98B2]">We only use these details to contact you about DeliberateHire AI.</p>
+      <p className="text-center text-xs text-[#8A98B2]">We only use these details to contact you about PickMyHire.ai.</p>
     </form>
   );
 }

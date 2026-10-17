@@ -1,8 +1,8 @@
 import Image from "next/image";
-import logoCompact from "@/public/brand/deliberatehire-logo-compact.png";
-import logoLight from "@/public/brand/deliberatehire-logo-compact-light.png";
+import logoCompact from "@/public/brand/pickmyhire-logo.png";
+import logoLight from "@/public/brand/pickmyhire-logo-light.png";
 
-export const PRODUCT_NAME = "DeliberateHire AI";
+export const PRODUCT_NAME = "PickMyHire.ai";
 
 /**
  * `compact` is the single-line mark + wordmark used across the product.

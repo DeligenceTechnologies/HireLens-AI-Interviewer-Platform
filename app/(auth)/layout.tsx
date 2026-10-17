@@ -5,7 +5,7 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="flex flex-col px-6 py-8 sm:px-12">
-        <Link href="/" className="self-start"><Logo height={28} /></Link>
+        <Link href="/" className="self-start"><Logo height={36} /></Link>
         <div className="flex flex-1 items-center justify-center py-10">
           <div className="w-full max-w-sm">{children}</div>
         </div>

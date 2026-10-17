@@ -21,7 +21,7 @@ export const POST = route(async (req) => {
   if (!input.inviteToken && !input.companyInvite) {
     const { enabled, code } = await getSignupCode();
     if (!enabled || !code || !input.accessCode || !safeEqual(input.accessCode.trim(), code)) {
-      throw new ApiError(403, "DeliberateHire AI is available by approval. Book a demo or request access to get an access code.");
+      throw new ApiError(403, "PickMyHire.ai is available by approval. Book a demo or request access to get an access code.");
     }
   }
   const { userId, orgId } = await signup({ ...input, companyInviteToken: input.inviteToken ? undefined : input.companyInvite });

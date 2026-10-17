@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-sidebar px-3 py-4 lg:flex">
-        <Link href="/dashboard" className="mb-6 px-2"><Logo height={24} /></Link>
+        <Link href="/dashboard" className="mb-6 px-2"><Logo height={30} /></Link>
         <SidebarNav hidden={hiddenNav} />
         {auth.isPlatformAdmin && (
           <Link href="/admin" className="mt-4 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-muted">

@@ -1,4 +1,4 @@
-# DeliberateHire AI — AI Interviewer Platform
+# PickMyHire.ai — AI Interviewer Platform
 
 Recruiters create jobs, invite candidates to personalized AI video interviews, and review evidence-backed reports. Every assessment links to timestamped transcript moments and the recording.
 

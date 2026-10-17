@@ -7,7 +7,7 @@ const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: { default: "DeliberateHire AI", template: "%s · DeliberateHire AI" },
+  title: { default: "PickMyHire.ai", template: "%s · PickMyHire.ai" },
   description: "Structured, evidence-based AI video interviews for recruiting teams.",
   // Set here (not as app/icon.png) so candidate pages can replace it with the company's logo.
   icons: { icon: "/brand/icon.png", apple: "/brand/apple-icon.png" },
