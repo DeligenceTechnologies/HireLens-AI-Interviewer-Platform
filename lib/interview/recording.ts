@@ -13,11 +13,13 @@ import { paths, storage } from "@/lib/storage";
 import { resolveToken } from "./controller";
 
 export const MAX_CHUNK_BYTES = 8 * 1024 * 1024;
-const ALLOWED_MIME = /^video\/webm|^video\/mp4|^audio\/webm/;
+const ALLOWED_MIME = /^video\/webm|^video\/mp4|^audio\/webm|^audio\/mp4/;
 /** Max bytes returned per range response; browsers request the rest as needed. */
 const MAX_RANGE_BYTES = 8 * 1024 * 1024;
 
-export async function startRecordingPart(token: string, input: { offset_ms: number; mime_type: string }) {
+export type RecordingTrack = "candidate" | "interviewer";
+
+export async function startRecordingPart(token: string, input: { offset_ms: number; mime_type: string; track?: RecordingTrack }) {
   const ctx = await resolveToken(token);
   if (!["in_progress", "completing"].includes(ctx.status)) throw new ApiError(409, "The interview is not in progress.");
   if (!ALLOWED_MIME.test(input.mime_type)) throw new ApiError(415, "Unsupported recording format.");
@@ -25,8 +27,8 @@ export async function startRecordingPart(token: string, input: { offset_ms: numb
     await tx`select id from interviews where id = ${ctx.id} for update`;
     const [{ next }] = await tx<{ next: number }[]>`select coalesce(max(part_index), -1) + 1 as next from recordings where interview_id = ${ctx.id}`;
     const mime = input.mime_type.split(";")[0];
-    await tx`insert into recordings (organization_id, interview_id, part_index, offset_ms, storage_path, mime_type, status)
-      values (${ctx.orgId}, ${ctx.id}, ${next}, ${Math.max(0, Math.round(input.offset_ms))}, ${paths.recordingFile(ctx.orgId, ctx.id, next)}, ${mime}, 'uploading')`;
+    await tx`insert into recordings (organization_id, interview_id, part_index, offset_ms, storage_path, mime_type, status, track)
+      values (${ctx.orgId}, ${ctx.id}, ${next}, ${Math.max(0, Math.round(input.offset_ms))}, ${paths.recordingFile(ctx.orgId, ctx.id, next)}, ${mime}, 'uploading', ${input.track ?? "candidate"})`;
     return { part_index: next };
   });
 }
@@ -120,13 +122,14 @@ export async function finalizeAllParts(orgId: string, interviewId: string) {
 
 /** Playback URLs for an authorized recruiter. */
 export async function recordingUrls(orgId: string, interviewId: string) {
-  const parts = await withOrg(orgId, (tx) => tx<{ id: string; part_index: number; offset_ms: number; storage_path: string; mime_type: string; duration_seconds: number | null; chunked: boolean }[]>`
-    select r.id, r.part_index, r.offset_ms, r.storage_path, r.mime_type, r.duration_seconds,
+  const parts = await withOrg(orgId, (tx) => tx<{ id: string; part_index: number; offset_ms: number; storage_path: string; mime_type: string; duration_seconds: number | null; track: RecordingTrack; chunked: boolean }[]>`
+    select r.id, r.part_index, r.offset_ms, r.storage_path, r.mime_type, r.duration_seconds, r.track,
       exists (select 1 from recording_chunks c where c.recording_id = r.id) as chunked
     from recordings r
     where r.interview_id = ${interviewId} and r.organization_id = ${orgId} and r.status = 'stored' order by r.part_index`);
   return Promise.all(parts.map(async (p) => ({
     part_index: p.part_index,
+    track: p.track,
     offset_ms: p.offset_ms,
     duration_seconds: p.duration_seconds,
     mime_type: p.mime_type,

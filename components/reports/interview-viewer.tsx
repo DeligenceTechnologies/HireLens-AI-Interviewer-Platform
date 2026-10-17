@@ -61,6 +61,7 @@ export function InterviewViewer({ detail, initialTab, showScores, canViewRecordi
   const [tab, setTab] = useState<ViewerTab>(initialTab);
   const [segments, setSegments] = useState<Segment[] | null>(null);
   const [parts, setParts] = useState<RecordingPart[] | null>(null);
+  const [voice, setVoice] = useState<RecordingPart[] | null>(null);
   const [recError, setRecError] = useState<string | null>(canViewRecording ? null : "You don't have access to recordings.");
   const [currentMs, setCurrentMs] = useState(0);
   const [focused, setFocused] = useState<string | null>(null);
@@ -74,7 +75,7 @@ export function InterviewViewer({ detail, initialTab, showScores, canViewRecordi
     if (!started) return;
     api<{ segments: Segment[] }>(`/api/interviews/${detail.id}/transcript`).then((r) => setSegments(r.segments)).catch(() => setSegments([]));
     if (canViewRecording) {
-      api<{ parts: RecordingPart[] }>(`/api/interviews/${detail.id}/recording`).then((r) => setParts(r.parts)).catch((e) => setRecError((e as Error).message));
+      api<{ parts: RecordingPart[]; voice?: RecordingPart[] }>(`/api/interviews/${detail.id}/recording`).then((r) => { setParts(r.parts); setVoice(r.voice ?? []); }).catch((e) => setRecError((e as Error).message));
     }
   }, [detail.id, started, canViewRecording, detail.segment_count]);
 
@@ -113,7 +114,7 @@ export function InterviewViewer({ detail, initialTab, showScores, canViewRecordi
 
   const media = (compact: boolean) => (
     <div className={cn("space-y-3", compact && "lg:sticky lg:top-20")}>
-      <VideoPlayer ref={player} parts={parts} error={recError} onTime={setCurrentMs} />
+      <VideoPlayer ref={player} parts={parts} voice={voice} error={recError} onTime={setCurrentMs} />
       <InterviewTimeline sections={sectionsForTimeline} totalMs={totalMs} currentMs={currentMs} onSeek={(ms) => jump(ms)} />
       {compact && (
         <TranscriptViewer className="h-[42vh]" segments={segments} currentMs={currentMs} focusedId={focused} onSeek={(ms, id) => jump(ms, id)} sections={detail.sections} />

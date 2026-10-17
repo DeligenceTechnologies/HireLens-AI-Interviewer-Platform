@@ -8,7 +8,8 @@ import { recordingUrls } from "@/lib/interview/recording";
 export const GET = route<{ id: string }>(async (_req, { id }) => {
   const auth = await requireApiAuth("recording:view");
   const interviewId = uuidParam(id);
-  const parts = await recordingUrls(auth.orgId, interviewId);
+  const all = await recordingUrls(auth.orgId, interviewId);
   await withOrg(auth.orgId, (tx) => audit(tx, { orgId: auth.orgId, userId: auth.userId, action: "interview.recording_accessed", entityType: "interview", entityId: interviewId }));
-  return { parts };
+  // `parts`: the candidate's video; `voice`: the interviewer's voice, played in sync.
+  return { parts: all.filter((p) => p.track === "candidate"), voice: all.filter((p) => p.track === "interviewer") };
 });
