@@ -1,6 +1,6 @@
 // Illustrative product previews for the marketing page, built from the same
 // visual language as the app. Content is sample data, labelled as such.
-import { CheckCircle2, CircleDashed, Mic, PlayCircle, Radio, Sparkles } from "lucide-react";
+import { Bot, CheckCircle2, CircleDashed, Mic, PlayCircle, Radio, Sparkles, Star, Users } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
@@ -139,6 +139,56 @@ export function InterviewMock() {
             <span className="flex items-center gap-1.5 text-[11px] text-zinc-400"><Mic className="size-3.5 text-emerald-400" /> Mic on</span>
             <span className="rounded-md bg-indigo-500 px-2 py-1 text-[11px] font-semibold text-white">Done answering</span>
           </div>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+/** One candidate's progress across AI and human rounds, through to the shortlist. */
+export function PipelineMock() {
+  const rounds: { name: string; kind: "AI" | "Human"; detail: React.ReactNode; status: string; tone: "green" | "amber" }[] = [
+    { name: "AI screening", kind: "AI", detail: "Report ready · 28 min", status: "Qualified", tone: "green" },
+    {
+      name: "Technical interview", kind: "Human",
+      detail: <span className="inline-flex items-center gap-1"><Star className="size-3 fill-[#F5B301] text-[#F5B301]" />4.3 · 2 scorecards</span>,
+      status: "Qualified", tone: "green",
+    },
+    {
+      name: "Final round", kind: "Human",
+      detail: <span className="inline-flex items-center gap-1"><Star className="size-3 fill-[#F5B301] text-[#F5B301]" />4.6 · 3 scorecards · Google Meet</span>,
+      status: "Qualified", tone: "green",
+    },
+  ];
+  const tones = { green: "bg-[#DDF5E8] text-[#0B6B3A]", amber: "bg-[#FDF0D9] text-[#8A5300]" };
+  return (
+    <Frame>
+      <div className="space-y-4 p-5">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-[#0F1F3A]">Priya Sharma</p>
+            <p className="text-xs text-[#5A6A86]">Backend Engineer · Hiring progress</p>
+          </div>
+          <span className="shrink-0 rounded-full bg-[#E0F2FE] px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-[#0369A1]">Shortlisted</span>
+        </div>
+        <ol className="space-y-2.5">
+          {rounds.map((r, i) => (
+            <li key={r.name} className="flex items-center gap-3 rounded-xl border border-[#E3EAF5] p-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#F0F5FD] text-[#0B5BD3]">
+                {r.kind === "AI" ? <Bot className="size-4" /> : <Users className="size-4" />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-[#0F1F3A]">{i + 1}. {r.name} <span className="font-normal text-[#7A8AA6]">· {r.kind}</span></p>
+                <p className="mt-0.5 text-[11px] text-[#5A6A86]">{r.detail}</p>
+              </div>
+              <span className={cn("shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold", tones[r.tone])}>
+                {r.status === "Qualified" && <CheckCircle2 className="mr-1 inline size-3 align-[-2px]" />}{r.status}
+              </span>
+            </li>
+          ))}
+        </ol>
+        <div className="rounded-xl bg-[#F0F5FD] p-3 text-[11px] leading-relaxed text-[#3D4D6A]">
+          <span className="font-semibold text-[#0F1F3A]">All rounds qualified</span> · Shortlisted by Anita R. on 14 Oct · Scorecards locked
         </div>
       </div>
     </Frame>

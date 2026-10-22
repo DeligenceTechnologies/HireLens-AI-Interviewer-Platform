@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
-  ArrowRight, BarChart3, Bell, Briefcase, Lightbulb, CalendarX2, Check, CheckCircle2, Clock, FileSearch, FileStack,
+  ArrowRight, BarChart3, Bell, Briefcase, ClipboardCheck, Lightbulb, CalendarX2, Check, CheckCircle2, Clock, FileSearch, FileStack,
   Fingerprint, Globe, KeyRound, Link2, Lock, MessageSquareText, PlayCircle, Scale, ScrollText, ShieldCheck, Sparkles,
   Timer, UserCheck, Users, Video, X, Calculator, Code2, GraduationCap, Headphones, HeartPulse, Megaphone, Store, Truck, Workflow,
 } from "lucide-react";
 import { Copyright, Logo } from "@/components/layout/logo";
-import { InterviewMock, ReportMock, ScreeningMock } from "@/components/marketing/mocks";
+import { InterviewMock, PipelineMock, ReportMock, ScreeningMock } from "@/components/marketing/mocks";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { DemoVideo } from "@/components/marketing/demo-video";
 import { AccessRequestForm } from "@/components/marketing/access-request-form";
@@ -48,7 +48,7 @@ const STEPS = [
   { icon: Lightbulb, title: "Personal interview plan", body: "Every invited candidate gets questions built from the job and their own resume, within your template." },
   { icon: Video, title: "Live AI interview", body: "A voice and video interview with adaptive follow-ups, whenever suits the candidate, with no scheduling." },
   { icon: FileSearch, title: "Evidence report", body: "Each section is assessed and linked to the exact moment in the transcript and recording." },
-  { icon: UserCheck, title: "Your team decides", body: "Compare candidates, shortlist, and move the right people to the next round. The AI never decides." },
+  { icon: UserCheck, title: "Your team decides", body: "Mark each round Qualified, Not qualified or On hold, add human rounds, and shortlist with the full picture. The AI never decides." },
 ];
 
 const COMPARE: [string, string, string][] = [
@@ -57,6 +57,7 @@ const COMPARE: [string, string, string][] = [
   ["Personalization", "Generic scripts or improvised questions", "Questions built from the job and each resume"],
   ["Notes", "Partial notes written from memory", "Full transcript, recording and structured report"],
   ["Verification", "“Trust me, they were strong”", "Every assessment links to the exact moment"],
+  ["Later rounds", "Notes scattered across email and spreadsheets", "Every round, scorecard and decision on one candidate page"],
   ["Recruiter time", "About an hour per candidate", "About 10 minutes of review"],
 ];
 
@@ -70,12 +71,12 @@ const MORE = [
 ];
 
 const TRUST = [
-  { icon: UserCheck, title: "Humans decide", body: "No AI output ever makes a hire or reject decision. PickMyHire.ai prepares the evidence; your team decides." },
+  { icon: UserCheck, title: "Humans decide", body: "No AI output ever makes a hire or reject decision. Your team decides each round, and every decision records who made it and when." },
   { icon: Scale, title: "Fair by design", body: "Only job-relevant evidence is assessed. No inference from age, gender, accent, appearance or emotion." },
   { icon: Fingerprint, title: "Consent first", body: "Candidates see a plain-language notice and give recorded, timestamped consent before anything starts." },
   { icon: Lock, title: "Company data isolated", body: "Each company's data is separated at the database level, with server-side checks on every request." },
   { icon: KeyRound, title: "Private by default", body: "Resumes and recordings live in private storage and open only through short-lived links." },
-  { icon: ScrollText, title: "Full audit trail", body: "Report views, evidence clicks and recording access are logged for accountability." },
+  { icon: ScrollText, title: "Full audit trail", body: "Report views, recording access, round decisions, reopened rounds and scorecard changes are all logged." },
 ];
 
 const TEAM_SHOTS = [
@@ -102,6 +103,14 @@ const TEAM_SHOTS = [
     points: ["Five roles: Owner, Admin, Recruiter, Interviewer, Viewer", "Candidate data visible only to hiring roles", "Every sensitive action recorded in an audit log"],
     src: "/marketing/team.webp",
     alt: "Team settings page listing members and their roles",
+  },
+  {
+    icon: ClipboardCheck,
+    title: "Run the next rounds together",
+    body: "Schedule human interviews with your panel, collect a scorecard from each interviewer, and decide each round as a team.",
+    points: ["Invite and calendar file with your Zoom, Meet or Teams link", "Each interviewer rates your criteria and recommends an outcome", "Decision locks the scorecards, with full history kept"],
+    src: "/marketing/scorecard.webp",
+    alt: "Human interview page with the panel's scorecards and the team's decision",
   },
 ];
 
@@ -132,6 +141,8 @@ const FAQ = [
   ["Does it work for my industry?", "Yes, for any role where a structured conversation shows fit: technology, sales, support, finance, operations, healthcare administration, education and more. Questions come from your job description and each candidate's resume, and templates let you set the sections and criteria for each role. Interviews are currently in English, and they assess what candidates say, so hands-on skills such as live coding or practical trade work still need their own test."],
   ["How long is an interview?", "You decide in the template. Typical setups range from a 15-minute screen to a 45-minute structured technical interview."],
   ["What happens if a candidate's connection drops?", "Progress is saved continuously. The candidate reopens their link and continues where they left off, and the recording is kept in parts."],
+  ["Can we run human interviews too?", "Yes. Add human rounds to a job, or schedule a one-off interview for a single candidate. Pick the panel, date and time zone, and send the invite. Each interviewer fills in a scorecard with your criteria, and your team marks the round Qualified, Not qualified or On hold. Scorecards lock once a decision is made."],
+  ["Does it work with Zoom, Google Meet or Teams?", "Yes. Paste your meeting link when you schedule a human interview. It goes into the invite and the calendar file, so candidates and interviewers join with the tool you already use."],
   ["Where is our data stored, and who can see it?", "Data is stored privately, isolated per company, and access is controlled by roles. For example, interviewers and viewers can't see candidate contact details or resumes. Retention settings let you remove old recordings automatically."],
 ];
 const PRICING_FAQ = "Pricing depends on your hiring volume. Book a demo or contact us and we'll put together a plan for your team.";
@@ -275,6 +286,18 @@ export default async function Home() {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
+            <div className="lg:order-2">
+              <SectionHead eyebrow="Rounds, decisions and shortlist" title="From first round to shortlist, in one place" />
+              <ul className="mt-7 space-y-3.5 text-base text-[#3D4D6A]">
+                {["Mix AI and human interview rounds in each job", "Your team marks every round Qualified, Not qualified or On hold, with who decided and when", "Schedule, reschedule or cancel human interviews, with a calendar invite and your own Zoom, Meet or Teams link", "Each interviewer fills in their own scorecard against your criteria", "Scorecards lock after a decision; reopening needs a reason, and earlier versions are kept"].map((t) => (
+                  <li key={t} className="flex gap-3"><Check className="mt-0.5 size-5 shrink-0 text-[#0B5BD3]" />{t}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="lg:order-1"><PipelineMock /><p className="mt-3 text-center text-xs text-[#7A8AA6]">Sample hiring progress</p></div>
+          </div>
+
           <div>
             <SectionHead eyebrow="And everything else" title="Built for real hiring teams" />
             <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -293,7 +316,7 @@ export default async function Home() {
       {/* Team: jobs, team management, invitations (real screenshots) */}
       <section id="team" className="scroll-mt-20 py-24">
         <div className="mx-auto max-w-7xl space-y-20 px-5 sm:px-8">
-          <SectionHead center eyebrow="For hiring teams" title="Set up a role and invite candidates in minutes" intro="Everything your team needs to run interviews together, with the right access for each person." />
+          <SectionHead center eyebrow="For hiring teams" title="Set up a role, invite candidates and run every round" intro="Everything your team needs to hire together, from the first invite to the final round, with the right access for each person." />
           {TEAM_SHOTS.map((shot, i) => (
             <div key={shot.title} className="grid items-center gap-10 lg:grid-cols-[1fr_1.35fr]">
               <div className={i % 2 ? "lg:order-2" : ""}>
