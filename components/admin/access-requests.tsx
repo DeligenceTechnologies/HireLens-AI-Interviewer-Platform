@@ -10,13 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAction } from "@/lib/client/use-action";
 import { formatDate } from "@/lib/format";
+import { INQUIRY_TOPIC_LABEL, type InquiryTopic } from "@/lib/marketing";
 import { cn } from "@/lib/utils";
 import { LinkResult } from "./link-result";
 import { QuotaInput } from "./quota-input";
 
-type Status = "new" | "contacted" | "approved" | "rejected";
+type Status = "new" | "contacted" | "approved" | "rejected" | "closed";
 export type AccessRequest = {
-  id: string; name: string; email: string; company: string; team_size: string | null; phone: string | null; message: string | null;
+  id: string; topic: InquiryTopic; topic_other: string | null; name: string; email: string; company: string | null; team_size: string | null; phone: string | null; message: string | null;
   status: Status; notes: string | null; created_at: string; reviewed_at: string | null; reviewer: string | null;
 };
 
@@ -25,6 +26,7 @@ const STATUS: Record<Status, { label: string; cls: string }> = {
   contacted: { label: "Contacted", cls: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300" },
   approved: { label: "Approved", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" },
   rejected: { label: "Rejected", cls: "bg-muted text-muted-foreground" },
+  closed: { label: "Closed", cls: "bg-muted text-muted-foreground" },
 };
 
 export function AccessRequestList({ requests, defaultQuota }: { requests: AccessRequest[]; defaultQuota: number | null }) {
@@ -40,7 +42,9 @@ function RequestCard({ r, defaultQuota }: { r: AccessRequest; defaultQuota: numb
   const router = useRouter();
   const [notes, setNotes] = useState(r.notes ?? "");
   const [approving, setApproving] = useState(false);
-  const [companyName, setCompanyName] = useState(r.company);
+  const [companyName, setCompanyName] = useState(r.company ?? "");
+  const access = r.topic === "access";
+  const done = access ? r.status === "approved" || r.status === "rejected" : r.status === "closed";
   const [email, setEmail] = useState(r.email);
   const [quota, setQuota] = useState<number | null>(defaultQuota);
   const [link, setLink] = useState<string | null>(null);
@@ -49,8 +53,13 @@ function RequestCard({ r, defaultQuota }: { r: AccessRequest; defaultQuota: numb
     <li className="rounded-xl border bg-card p-5">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold">{r.company}</p>
-          <p className="text-sm">{r.name}</p>
+          <p className="flex flex-wrap items-center gap-2">
+            <span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold", access ? "bg-primary/10 text-primary" : "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300")}>
+              {r.topic === "other" && r.topic_other ? `Other: ${r.topic_other}` : INQUIRY_TOPIC_LABEL[r.topic]}
+            </span>
+            <span className="font-semibold">{r.company ?? r.name}</span>
+          </p>
+          {r.company && <p className="text-sm">{r.name}</p>}
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><Mail className="size-3.5" />{r.email}</span>
             {r.phone && <span className="flex items-center gap-1"><Phone className="size-3.5" />{r.phone}</span>}
@@ -67,14 +76,16 @@ function RequestCard({ r, defaultQuota }: { r: AccessRequest; defaultQuota: numb
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {notesChanged && <Button size="sm" variant="outline" disabled={!!pending} onClick={() => run("notes", `/api/admin/requests/${r.id}`, { method: "PATCH", body: { notes: notes.trim() || null }, success: "Notes saved" })}>Save notes</Button>}
-        {r.status !== "approved" && (
+        {!done && (
           <>
-            <Button size="sm" onClick={() => { setLink(null); setApproving(true); }}><CheckCircle2 /> Approve</Button>
-            {r.status !== "contacted" && <Button size="sm" variant="outline" disabled={!!pending} onClick={() => run("st", `/api/admin/requests/${r.id}`, { method: "PATCH", body: { status: "contacted" }, success: "Marked as contacted" })}>Mark contacted</Button>}
-            {r.status !== "rejected" && <Button size="sm" variant="ghost" disabled={!!pending} onClick={() => run("st", `/api/admin/requests/${r.id}`, { method: "PATCH", body: { status: "rejected" }, success: "Request rejected" })}>Reject</Button>}
+            {access && <Button size="sm" onClick={() => { setLink(null); setApproving(true); }}><CheckCircle2 /> Approve</Button>}
+            {r.status !== "contacted" && <Button size="sm" variant={access ? "outline" : "default"} disabled={!!pending} onClick={() => run("st", `/api/admin/requests/${r.id}`, { method: "PATCH", body: { status: "contacted" }, success: "Marked as contacted" })}>Mark contacted</Button>}
+            {access
+              ? <Button size="sm" variant="ghost" disabled={!!pending} onClick={() => run("st", `/api/admin/requests/${r.id}`, { method: "PATCH", body: { status: "rejected" }, success: "Request rejected" })}>Reject</Button>
+              : <Button size="sm" variant="outline" disabled={!!pending} onClick={() => run("st", `/api/admin/requests/${r.id}`, { method: "PATCH", body: { status: "closed" }, success: "Closed" })}>Close</Button>}
           </>
         )}
-        {(r.status === "rejected" || r.status === "approved") && (
+        {done && (
           <Button size="sm" variant="ghost" disabled={!!pending} onClick={() => run("st", `/api/admin/requests/${r.id}`, { method: "PATCH", body: { status: "new" }, success: "Moved back to new" })}>Move back to new</Button>
         )}
         {r.reviewer && <span className="ml-auto text-xs text-muted-foreground">Last updated by {r.reviewer} · {formatDate(r.reviewed_at, true)}</span>}
@@ -83,7 +94,7 @@ function RequestCard({ r, defaultQuota }: { r: AccessRequest; defaultQuota: numb
       <Dialog open={approving} onOpenChange={(o) => { setApproving(o); if (!o && link) router.refresh(); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Approve {r.company}</DialogTitle>
+            <DialogTitle>Approve {r.company ?? r.name}</DialogTitle>
             <DialogDescription>Creates a one-time sign-up link. The company is created when they use it, with them as owner.</DialogDescription>
           </DialogHeader>
           {link ? (

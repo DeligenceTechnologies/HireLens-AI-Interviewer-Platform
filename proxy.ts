@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Optimistic check only: real authorization happens server-side in every
 // page and route handler (see lib/auth/session.ts).
-const PROTECTED = ["/dashboard", "/jobs", "/candidates", "/interviews", "/templates", "/settings"];
+const PROTECTED = ["/dashboard", "/jobs", "/candidates", "/interviews", "/templates", "/settings", "/help"];
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -16,5 +16,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/jobs/:path*", "/candidates/:path*", "/interviews/:path*", "/templates/:path*", "/settings/:path*"],
+  matcher: ["/dashboard/:path*", "/jobs/:path*", "/candidates/:path*", "/interviews/:path*", "/templates/:path*", "/settings/:path*", "/help/:path*"],
 };

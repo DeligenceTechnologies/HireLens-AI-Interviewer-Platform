@@ -18,7 +18,7 @@ export default async function AdminOverviewPage() {
         <StatCard label="Companies" value={totals.companies} hint={`${totals.active} active · ${totals.suspended} suspended`} icon={Building2} />
         <StatCard label="Users" value={totals.users} icon={Users} />
         <StatCard label="Interviews completed" value={month.completed} hint={`This month · ${month.minutes} min`} icon={Video} />
-        <StatCard label="Access requests" value={totals.new_requests} hint={`New · ${totals.pending_links} sign-up links pending`} icon={Inbox} />
+        <StatCard label="Inquiries" value={totals.new_requests} hint={`New · ${totals.support_waiting} support waiting · ${totals.pending_links} sign-up links pending`} icon={Inbox} />
       </div>
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">

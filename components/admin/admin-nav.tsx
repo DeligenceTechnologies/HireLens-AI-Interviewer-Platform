@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, Inbox, LayoutDashboard, ScrollText, Settings, Users } from "lucide-react";
+import { Building2, Inbox, LayoutDashboard, LifeBuoy, ScrollText, Settings, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
-  { href: "/admin/requests", label: "Access requests", icon: Inbox },
+  { href: "/admin/requests", label: "Inquiries", icon: Inbox },
+  { href: "/admin/support", label: "Support", icon: LifeBuoy },
   { href: "/admin/companies", label: "Companies", icon: Building2 },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/settings", label: "Settings", icon: Settings },
@@ -15,7 +16,7 @@ const NAV = [
 ];
 
 /** Vertical on desktop, a scrollable row of tabs on small screens. */
-export function AdminNav({ newRequests }: { newRequests: number }) {
+export function AdminNav({ newRequests, supportWaiting }: { newRequests: number; supportWaiting: number }) {
   const pathname = usePathname();
   return (
     <nav className="flex gap-1 overflow-x-auto lg:flex-col lg:gap-0.5 lg:overflow-visible" aria-label="Admin">
@@ -33,9 +34,10 @@ export function AdminNav({ newRequests }: { newRequests: number }) {
           >
             <Icon className="size-4" />
             {label}
-            {href === "/admin/requests" && newRequests > 0 && (
-              <span className="ml-auto rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground tabular">{newRequests}</span>
-            )}
+            {(() => {
+              const n = href === "/admin/requests" ? newRequests : href === "/admin/support" ? supportWaiting : 0;
+              return n > 0 && <span className="ml-auto rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground tabular">{n}</span>;
+            })()}
           </Link>
         );
       })}

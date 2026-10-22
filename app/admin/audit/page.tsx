@@ -8,7 +8,9 @@ import Link from "next/link";
 export const metadata = { title: "Audit log" };
 
 const LABEL: Record<string, string> = {
-  "access_request.updated": "Updated access request",
+  "access_request.updated": "Updated inquiry",
+  "support.replied": "Replied to support request",
+  "support.status_changed": "Changed support request status",
   "access_request.approved": "Approved access request",
   "company_invite.created": "Created company sign-up link",
   "company_invite.revoked": "Revoked company sign-up link",

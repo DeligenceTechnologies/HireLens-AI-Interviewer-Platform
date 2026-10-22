@@ -4,6 +4,7 @@ import { audit } from "@/lib/audit";
 import type { Role } from "@/lib/auth/permissions";
 import { withSystem, type Tx } from "@/lib/database/db";
 import { env } from "@/lib/env";
+import type { InquiryTopic } from "@/lib/marketing";
 import { generateToken, hashToken } from "@/lib/security/tokens";
 import { platformAudit, writeSetting, getDefaultQuota, getSignupCode, getTrialSettings, type TrialSettings } from "./platform";
 import { COUNTED_STATUSES, RUNNING_STATUSES, WAITING_STATUSES, getQuotaStatus } from "./quota";
@@ -34,13 +35,14 @@ function quotaCounts(tx: Tx) {
 
 export async function getOverview() {
   return withSystem(async (tx) => {
-    const [totals] = await tx<{ companies: number; active: number; suspended: number; users: number; new_requests: number; pending_links: number }[]>`
+    const [totals] = await tx<{ companies: number; active: number; suspended: number; users: number; new_requests: number; pending_links: number; support_waiting: number }[]>`
       select
         (select count(*)::int from organizations) as companies,
         (select count(*)::int from organizations where status = 'active') as active,
         (select count(*)::int from organizations where status = 'suspended') as suspended,
         (select count(*)::int from users) as users,
         (select count(*)::int from access_requests where status = 'new') as new_requests,
+        (select count(*)::int from support_tickets where status <> 'resolved' and not last_message_from_admin) as support_waiting,
         (select count(*)::int from company_invites where used_at is null and revoked_at is null and expires_at > now()) as pending_links`;
     const [month] = await tx<{ completed: number; minutes: number; ai_calls: number }[]>`
       select
@@ -74,16 +76,17 @@ export async function getOverview() {
 // Access requests and one-time company sign-up links
 // ---------------------------------------------------------------------------
 
-export type AccessRequestStatus = "new" | "contacted" | "approved" | "rejected";
+export type AccessRequestStatus = "new" | "contacted" | "approved" | "rejected" | "closed";
 
-export async function listAccessRequests(status?: AccessRequestStatus) {
+/** Home page inquiries: "Request access" (topic `access`) and "Contact us" (every other topic). */
+export async function listAccessRequests(status?: AccessRequestStatus, topic?: InquiryTopic) {
   return withSystem((tx) => tx<{
-    id: string; name: string; email: string; company: string; team_size: string | null; phone: string | null; message: string | null;
+    id: string; topic: InquiryTopic; topic_other: string | null; name: string; email: string; company: string | null; team_size: string | null; phone: string | null; message: string | null;
     status: AccessRequestStatus; notes: string | null; created_at: Date; reviewed_at: Date | null; reviewer: string | null;
   }[]>`
-    select r.id, r.name, r.email, r.company, r.team_size, r.phone, r.message, r.status, r.notes, r.created_at, r.reviewed_at, u.name as reviewer
+    select r.id, r.topic, r.topic_other, r.name, r.email, r.company, r.team_size, r.phone, r.message, r.status, r.notes, r.created_at, r.reviewed_at, u.name as reviewer
     from access_requests r left join users u on u.id = r.reviewed_by
-    ${status ? tx`where r.status = ${status}` : tx``}
+    where true ${status ? tx`and r.status = ${status}` : tx``} ${topic ? tx`and r.topic = ${topic}` : tx``}
     order by (r.status = 'new') desc, r.created_at desc limit 200`);
 }
 

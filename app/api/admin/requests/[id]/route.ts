@@ -4,7 +4,7 @@ import { requirePlatformAdminApi } from "@/lib/auth/session";
 import { updateAccessRequest } from "@/lib/services/admin";
 
 const Schema = z.object({
-  status: z.enum(["new", "contacted", "approved", "rejected"]).optional(),
+  status: z.enum(["new", "contacted", "approved", "rejected", "closed"]).optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
 });
 

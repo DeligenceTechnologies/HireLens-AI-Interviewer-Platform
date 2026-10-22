@@ -88,7 +88,7 @@ test("round decisions, human interview and shortlist", async ({ page }) => {
   const decision = page.locator("section", { has: page.getByRole("heading", { name: "Decision", exact: true }) });
   await decision.getByRole("button", { name: "Qualified", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Save decision" }).click();
-  await expect(page.getByText("Marked Qualified")).toBeVisible();
+  await expect(page.getByRole("main").getByText("Marked Qualified")).toBeVisible();
   // Deciding locks the scorecard.
   await expect(page.getByText(/Locked: the round decision was made/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Update scorecard" })).toHaveCount(0);

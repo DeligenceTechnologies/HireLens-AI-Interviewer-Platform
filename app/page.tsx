@@ -9,7 +9,7 @@ import { Copyright, Logo } from "@/components/layout/logo";
 import { InterviewMock, PipelineMock, ReportMock, ScreeningMock } from "@/components/marketing/mocks";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { DemoVideo } from "@/components/marketing/demo-video";
-import { AccessRequestForm } from "@/components/marketing/access-request-form";
+import { ContactForms } from "@/components/marketing/access-request-form";
 import Image from "next/image";
 import { DEMO_URL } from "@/lib/marketing";
 import { getTrialSettings } from "@/lib/services/platform";
@@ -174,7 +174,7 @@ export default async function Home() {
               {app || trial.enabled ? (
                 <>
                   <Link href={app?.href ?? "/signup"} className={BLUE_BTN}>{app?.label ?? "Start free trial"} <ArrowRight className="size-4" /></Link>
-                  <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className={GHOST_BTN}>Book a demo</a>
+                  {!app && <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className={GHOST_BTN}>Book a demo</a>}
                 </>
               ) : (
                 <>
@@ -435,30 +435,52 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Contact */}
-      <section id="contact" className="scroll-mt-20 py-24">
-        <div className="mx-auto grid max-w-7xl gap-8 px-5 sm:px-8 lg:grid-cols-[1fr_1.1fr]">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B5BD3] to-[#0B1E3D] p-8 sm:p-12">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(30rem_16rem_at_80%_0%,rgba(125,184,255,0.35),transparent)]" />
-            <div className="relative flex h-full flex-col">
-              <Eyebrow dark>Contact us</Eyebrow>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance text-white sm:text-[2.6rem] sm:leading-[1.15]">See PickMyHire.ai on your next open role</h2>
-              <p className="mt-5 text-lg leading-relaxed text-[#D6E6FF]">Book a 20-minute demo. We&apos;ll show the full flow, from apply link to evidence-backed report, and talk through pricing for your hiring volume.</p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                {(app || trial.enabled) && <Link href={app?.href ?? "/signup"} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-[#0B4FB8] hover:bg-[#EAF2FF]">{app?.label ?? "Start free trial"} <ArrowRight className="size-4" /></Link>}
-                <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className={app || trial.enabled
-                  ? "inline-flex items-center justify-center gap-2 rounded-xl border border-white/40 px-6 py-3.5 text-base font-semibold text-white hover:bg-white/10"
-                  : "inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-[#0B4FB8] hover:bg-[#EAF2FF]"}>Book a demo {!(app || trial.enabled) && <ArrowRight className="size-4" />}</a>
+      {/* Contact: support for signed-in customers, request access / contact us for everyone else */}
+      {app ? (
+        <section id="contact" className="scroll-mt-20 py-24">
+          <div className="mx-auto max-w-7xl px-5 sm:px-8">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B5BD3] to-[#0B1E3D] p-8 sm:p-12">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(30rem_16rem_at_80%_0%,rgba(125,184,255,0.35),transparent)]" />
+              <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+                <div className="max-w-2xl">
+                  <Eyebrow dark>Help and support</Eyebrow>
+                  <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance text-white sm:text-[2.6rem] sm:leading-[1.15]">Need help with your account?</h2>
+                  <p className="mt-5 text-lg leading-relaxed text-[#D6E6FF]">Write to our support team from inside the app. We&apos;ll reply there, and you can follow every request in one place.</p>
+                </div>
+                <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
+                  <Link href="/help" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-[#0B4FB8] hover:bg-[#EAF2FF]">Contact support <ArrowRight className="size-4" /></Link>
+                  <Link href={app.href} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/40 px-6 py-3.5 text-base font-semibold text-white hover:bg-white/10">{app.label}</Link>
+                </div>
               </div>
-              <div className="flex-1" />
-              <p className="mt-8 text-sm text-[#BFD3F5]">{trial.enabled
-                ? <>Start a free trial in a minute ({trialLine}), or book a call and we&apos;ll set up your workspace. Pricing: contact us.</>
-                : <>Access is by approval. Request access with the form, or book a call, and we&apos;ll set up your workspace. Pricing: contact us.</>}</p>
             </div>
           </div>
-          <AccessRequestForm />
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section id="contact" className="relative scroll-mt-20 py-24">
+          <span id="request-access" className="absolute top-0 scroll-mt-20" aria-hidden />
+          <div className="mx-auto grid max-w-7xl gap-8 px-5 sm:px-8 lg:grid-cols-[1fr_1.1fr]">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B5BD3] to-[#0B1E3D] p-8 sm:p-12">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(30rem_16rem_at_80%_0%,rgba(125,184,255,0.35),transparent)]" />
+              <div className="relative flex h-full flex-col">
+                <Eyebrow dark>Contact us</Eyebrow>
+                <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance text-white sm:text-[2.6rem] sm:leading-[1.15]">See PickMyHire.ai on your next open role</h2>
+                <p className="mt-5 text-lg leading-relaxed text-[#D6E6FF]">Book a 20-minute demo. We&apos;ll show the full flow, from apply link to evidence-backed report, and talk through pricing for your hiring volume.</p>
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                  {trial.enabled && <Link href="/signup" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-[#0B4FB8] hover:bg-[#EAF2FF]">Start free trial <ArrowRight className="size-4" /></Link>}
+                  <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className={trial.enabled
+                    ? "inline-flex items-center justify-center gap-2 rounded-xl border border-white/40 px-6 py-3.5 text-base font-semibold text-white hover:bg-white/10"
+                    : "inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-[#0B4FB8] hover:bg-[#EAF2FF]"}>Book a demo {!trial.enabled && <ArrowRight className="size-4" />}</a>
+                </div>
+                <div className="flex-1" />
+                <p className="mt-8 text-sm text-[#BFD3F5]">{trial.enabled
+                  ? <>Start a free trial in a minute ({trialLine}), or book a call and we&apos;ll set up your workspace. Questions about pricing or anything else? Use Contact us.</>
+                  : <>Access is by approval. Request access with the form, or book a call, and we&apos;ll set up your workspace. Questions about pricing or anything else? Use Contact us.</>}</p>
+              </div>
+            </div>
+            <ContactForms />
+          </div>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="border-t border-[#E3EAF5] bg-white">
@@ -480,9 +502,19 @@ export default async function Home() {
           <div>
             <p className="text-sm font-semibold">Contact</p>
             <ul className="mt-4 space-y-2.5 text-sm text-[#5A6A86]">
-              {(app || trial.enabled) && <li><Link href={app?.href ?? "/signup"} className="hover:text-[#0B5BD3]">{app?.label ?? "Start free trial"}</Link></li>}
-              <li><a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="hover:text-[#0B5BD3]">Book a demo</a></li>
-              <li><a href="#contact" className="hover:text-[#0B5BD3]">Request access</a></li>
+              {app ? (
+                <>
+                  <li><Link href={app.href} className="hover:text-[#0B5BD3]">{app.label}</Link></li>
+                  <li><Link href="/help" className="hover:text-[#0B5BD3]">Help and support</Link></li>
+                </>
+              ) : (
+                <>
+                  {trial.enabled && <li><Link href="/signup" className="hover:text-[#0B5BD3]">Start free trial</Link></li>}
+                  <li><a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="hover:text-[#0B5BD3]">Book a demo</a></li>
+                  <li><a href="#request-access" className="hover:text-[#0B5BD3]">Request access</a></li>
+                  <li><a href="#contact" className="hover:text-[#0B5BD3]">Contact us</a></li>
+                </>
+              )}
             </ul>
           </div>
         </div>

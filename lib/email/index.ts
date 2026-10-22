@@ -120,6 +120,30 @@ ${input.companyName} hiring team`,
     const tail = input.team && input.link ? `\n\nInterview guide and scorecard: ${input.link}` : input.kind === "cancelled" ? "" : "\n\nIf this time doesn't work for you, please reply to let us know.";
     return { subject, text: `Hi ${input.name},\n\n${lead}${details}${tail}\n\n${input.companyName}` };
   },
+  supportToAdmin(input: { kind: "new" | "reply"; company: string; name: string; email: string; category?: string; subject: string; message: string; link: string }) {
+    return {
+      subject: input.kind === "new" ? `Support: ${input.subject} (${input.company})` : `Re: ${input.subject} (${input.company})`,
+      text: `${input.kind === "new" ? `New support request${input.category ? ` (${input.category})` : ""}` : "New reply on a support request"} from ${input.name} <${input.email}>, ${input.company}.
+
+${input.message}
+
+Open in admin: ${input.link}`,
+    };
+  },
+  supportReply(input: { name: string; subject: string; message: string; link: string }) {
+    return {
+      subject: `Re: ${input.subject}`,
+      text: `Hi ${input.name},
+
+PickMyHire.ai support replied to your request "${input.subject}":
+
+${input.message}
+
+View the conversation or reply: ${input.link}
+
+PickMyHire.ai support`,
+    };
+  },
   verifyEmail(input: { name: string; link: string }) {
     return {
       subject: "Confirm your email to start your PickMyHire.ai trial",

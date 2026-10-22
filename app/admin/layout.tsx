@@ -5,12 +5,16 @@ import { SignOutButton } from "@/components/admin/sign-out-button";
 import { Logo } from "@/components/layout/logo";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { withSystem } from "@/lib/database/db";
+import { countOpenSupport } from "@/lib/services/support";
 
 export const metadata = { title: { default: "Platform admin", template: "%s · Admin · PickMyHire.ai" } };
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const admin = await requirePlatformAdmin();
-  const [{ n }] = await withSystem((tx) => tx<{ n: number }[]>`select count(*)::int as n from access_requests where status = 'new'`);
+  const [[{ n }], support] = await Promise.all([
+    withSystem((tx) => tx<{ n: number }[]>`select count(*)::int as n from access_requests where status = 'new'`),
+    countOpenSupport(),
+  ]);
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       <aside className="border-b bg-sidebar px-3 py-3 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-60 lg:shrink-0 lg:flex-col lg:border-r lg:border-b-0 lg:py-4">
@@ -21,7 +25,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
             <div className="lg:hidden"><SignOutButton /></div>
           </div>
         </div>
-        <AdminNav newRequests={n} />
+        <AdminNav newRequests={n} supportWaiting={support} />
         <div className="mt-auto hidden space-y-2 border-t pt-3 lg:block">
           {admin.hasCompany && (
             <Link href="/dashboard" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">

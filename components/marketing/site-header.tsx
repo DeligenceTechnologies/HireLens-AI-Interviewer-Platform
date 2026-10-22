@@ -35,7 +35,6 @@ export function SiteHeader({ trial = false, app = null }: { trial?: boolean; app
         <div className="ml-auto flex items-center gap-2 lg:ml-0">
           {app ? (
             <>
-              <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="hidden rounded-lg border border-[#CBD7EA] bg-white px-4 py-2 text-sm font-semibold whitespace-nowrap text-[#0F1F3A] hover:border-[#0B5BD3] hover:text-[#0B5BD3] sm:inline-flex">Book a demo</a>
               <Link href={app.href} className="inline-flex rounded-lg bg-[#0B5BD3] px-4 py-2 text-sm font-semibold whitespace-nowrap text-white shadow-sm hover:bg-[#0A4FB8]">{app.label}</Link>
             </>
           ) : trial ? (
@@ -59,7 +58,9 @@ export function SiteHeader({ trial = false, app = null }: { trial?: boolean; app
       <div className={cn("border-t border-[#E3EAF5] bg-[#F8FAFD] px-5 py-3 lg:hidden", !open && "hidden")}>
         <nav className="flex flex-col" aria-label="Mobile">
           {NAV.map((n) => <a key={n.href} href={n.href} onClick={() => setOpen(false)} className="rounded-lg px-2 py-2.5 text-sm font-medium text-[#0F1F3A] hover:bg-[#E9F0FB]">{n.label}</a>)}
-          <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="rounded-lg px-2 py-2.5 text-sm font-medium text-[#0F1F3A] hover:bg-[#E9F0FB]">Book a demo</a>
+          {app
+            ? <Link href="/help" onClick={() => setOpen(false)} className="rounded-lg px-2 py-2.5 text-sm font-medium text-[#0F1F3A] hover:bg-[#E9F0FB]">Help and support</Link>
+            : <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="rounded-lg px-2 py-2.5 text-sm font-medium text-[#0F1F3A] hover:bg-[#E9F0FB]">Book a demo</a>}
         </nav>
       </div>
     </header>

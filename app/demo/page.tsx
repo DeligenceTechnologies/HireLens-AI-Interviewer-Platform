@@ -53,14 +53,25 @@ export default async function DemoPage() {
               ))}
             </ol>
           </section>
+          {app ? (
+          <section className="rounded-2xl border border-[#DCE4F0] bg-white p-6">
+            <h2 className="text-lg font-semibold">Ready to try it?</h2>
+            <p className="mt-2 text-[15px] text-[#4A5874]">Head back to your workspace to create a job and invite candidates. Questions? Our support team is one click away.</p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">
+              <Link href={app.href} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0B5BD3] px-5 py-3 text-sm font-semibold text-white hover:bg-[#0A4FB8]">{app.label} <ArrowRight className="size-4" /></Link>
+              <Link href="/help" className="inline-flex items-center justify-center rounded-xl border border-[#CBD7EA] bg-white px-5 py-3 text-sm font-semibold hover:border-[#0B5BD3] hover:text-[#0B5BD3]">Help and support</Link>
+            </div>
+          </section>
+          ) : (
           <section className="rounded-2xl border border-[#DCE4F0] bg-white p-6">
             <h2 className="text-lg font-semibold">Want to try it on your next role?</h2>
             <p className="mt-2 text-[15px] text-[#4A5874]">{trial.enabled ? `Start a free trial (${trial.interviews} interviews for ${trial.days} days), or book a call and we'll walk through your hiring process.` : "Book a call and we'll walk through your hiring process, or request access for your team."}</p>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">
               <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0B5BD3] px-5 py-3 text-sm font-semibold text-white hover:bg-[#0A4FB8]">Book a demo <ArrowRight className="size-4" /></a>
-              <Link href={app?.href ?? (trial.enabled ? "/signup" : "/#contact")} className="inline-flex items-center justify-center rounded-xl border border-[#CBD7EA] bg-white px-5 py-3 text-sm font-semibold hover:border-[#0B5BD3] hover:text-[#0B5BD3]">{app?.label ?? (trial.enabled ? "Start free trial" : "Request access")}</Link>
+              <Link href={trial.enabled ? "/signup" : "/#request-access"} className="inline-flex items-center justify-center rounded-xl border border-[#CBD7EA] bg-white px-5 py-3 text-sm font-semibold hover:border-[#0B5BD3] hover:text-[#0B5BD3]">{trial.enabled ? "Start free trial" : "Request access"}</Link>
             </div>
           </section>
+          )}
         </div>
       </main>
       <footer className="border-t border-[#E3EAF5] bg-white py-6 text-center"><Copyright /></footer>

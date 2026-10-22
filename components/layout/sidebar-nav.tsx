@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, FileStack, LayoutDashboard, Settings, Users, Video } from "lucide-react";
+import { Briefcase, FileStack, LayoutDashboard, LifeBuoy, Settings, Users, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -12,6 +12,7 @@ const NAV = [
   { href: "/interviews", label: "Interviews", icon: Video },
   { href: "/templates", label: "Templates", icon: FileStack },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/help", label: "Help and support", icon: LifeBuoy },
 ];
 
 /** `hidden` lists nav hrefs the current role can't open (computed on the server). */

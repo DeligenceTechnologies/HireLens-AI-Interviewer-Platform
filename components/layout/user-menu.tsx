@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { LogOut, Settings, User } from "lucide-react";
+import { LifeBuoy, LogOut, Settings, User } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { api } from "@/lib/client/api";
 import { initials } from "@/lib/format";
@@ -23,6 +23,7 @@ export function UserMenu({ name, email, role }: { name: string; email: string; r
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push("/settings/profile")}><User /> Profile</DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push("/settings")}><Settings /> Settings</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/help")}><LifeBuoy /> Help and support</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={async () => {
