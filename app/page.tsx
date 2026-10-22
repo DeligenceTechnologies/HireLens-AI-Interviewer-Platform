@@ -84,7 +84,7 @@ const TEAM_SHOTS = [
     title: "Create a job in minutes",
     body: "Paste the job description and pick an interview template. PickMyHire.ai extracts the requirements and is ready to screen and interview.",
     points: ["Required and preferred skills extracted automatically", "Choose a template: sections, timing and follow-up limits", "Turn on a public apply link with one switch"],
-    src: "/marketing/job.png",
+    src: "/marketing/job.webp",
     alt: "Job page showing parsed requirements, applications and interviews",
   },
   {
@@ -92,7 +92,7 @@ const TEAM_SHOTS = [
     title: "Invite candidates with a secure link",
     body: "Add a candidate with their resume and send a personal interview link by email, or copy it and share it yourself.",
     points: ["One personal, expiring link per candidate", "Reminders and new links in one click", "The interview plan is tailored to the resume automatically"],
-    src: "/marketing/invite.png",
+    src: "/marketing/invite.webp",
     alt: "Invitation dialog showing a candidate's secure interview link",
   },
   {
@@ -100,7 +100,7 @@ const TEAM_SHOTS = [
     title: "Bring your whole team",
     body: "Invite colleagues and give each person the right access, from owners and admins to interviewers who only review interviews.",
     points: ["Five roles: Owner, Admin, Recruiter, Interviewer, Viewer", "Candidate data visible only to hiring roles", "Every sensitive action recorded in an audit log"],
-    src: "/marketing/team.png",
+    src: "/marketing/team.webp",
     alt: "Team settings page listing members and their roles",
   },
 ];
@@ -306,7 +306,7 @@ export default async function Home() {
               </div>
               <div className={i % 2 ? "lg:order-1" : ""}>
                 <div className="overflow-hidden rounded-2xl border border-[#DCE4F0] bg-white shadow-[0_24px_60px_-20px_rgba(11,30,61,0.25)]">
-                  <Image src={shot.src} alt={shot.alt} width={1600} height={1000} className="h-auto w-full" />
+                  <Image src={shot.src} alt={shot.alt} width={1600} height={1000} sizes="(min-width: 1280px) 680px, (min-width: 1024px) 55vw, 100vw" className="h-auto w-full" />
                 </div>
                 <p className="mt-3 text-center text-xs text-[#7A8AA6]">Screenshot of the PickMyHire.ai app with sample data</p>
               </div>

@@ -1,5 +1,5 @@
 /** The recorded product walkthrough (served from /public/demo). */
-export const DEMO_VIDEO = { src: "/demo/pickmyhire-ai-demo.mp4", poster: "/demo/poster.jpg", minutes: 10 };
+export const DEMO_VIDEO = { src: "/demo/pickmyhire-ai-demo.mp4", poster: "/demo/poster.webp", minutes: 10 };
 
 export function DemoVideo({ className = "" }: { className?: string }) {
   return (

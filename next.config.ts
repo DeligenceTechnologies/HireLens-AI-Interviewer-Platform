@@ -11,6 +11,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Marketing images rarely change (new files get new names): let browsers and
+  // proxies keep resized copies for a week instead of re-requesting them.
+  images: { minimumCacheTTL: 7 * 24 * 60 * 60 },
   serverExternalPackages: ["postgres", "unpdf", "mammoth"],
   async headers() {
     return [

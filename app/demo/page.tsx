@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "PickMyHire.ai · Product demo",
     description: "A 10-minute walkthrough with a live AI interview and the evidence-backed report.",
-    images: ["/demo/poster.jpg"],
+    images: ["/demo/og.jpg"],
   },
 };
 
