@@ -4,7 +4,7 @@ services:
   - type: web
     name: ai-interviewer
     runtime: node
-    plan: free
+    plan: pro
     region: singapore
     buildCommand: npm ci && npm run build
     startCommand: npm start
@@ -18,8 +18,9 @@ services:
         value: interview-private
       - key: AI_PROVIDER
         value: auto
+      # Set in the Render dashboard (resend in production, log to only record emails).
       - key: EMAIL_PROVIDER
-        value: log
+        sync: false
       - key: APP_SECRET
         generateValue: true
       # Secrets — enter these in the Render dashboard when creating the service.
