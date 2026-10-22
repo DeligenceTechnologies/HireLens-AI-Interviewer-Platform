@@ -18,23 +18,28 @@ export type Permission =
   | "privacy:manage"
   | "audit:view"
   | "usage:view"
-  | "branding:manage";
+  | "branding:manage"
+  /** Mark rounds Qualified / Not qualified and move candidates to Shortlisted, Hired… */
+  | "decision:write"
+  /** Fill in a scorecard for a human interview you're on the panel of. */
+  | "scorecard:write";
 
 const MATRIX: Record<Role, Permission[]> = {
   owner: [
     "org:manage", "billing:manage", "team:manage", "job:write", "candidate:view", "candidate:write", "template:write",
     "interview:write", "interview:view", "report:view", "report:regenerate", "recording:view",
-    "data:delete", "privacy:manage", "audit:view", "usage:view", "branding:manage",
+    "data:delete", "privacy:manage", "audit:view", "usage:view", "branding:manage", "decision:write", "scorecard:write",
   ],
   admin: [
     "team:manage", "job:write", "candidate:view", "candidate:write", "template:write", "interview:write", "interview:view",
     "report:view", "report:regenerate", "recording:view", "data:delete", "privacy:manage", "audit:view", "usage:view", "branding:manage",
+    "decision:write", "scorecard:write",
   ],
   recruiter: [
     "job:write", "candidate:view", "candidate:write", "template:write", "interview:write", "interview:view", "report:view",
-    "report:regenerate", "recording:view",
+    "report:regenerate", "recording:view", "decision:write", "scorecard:write",
   ],
-  interviewer: ["interview:view", "report:view", "recording:view"],
+  interviewer: ["interview:view", "report:view", "recording:view", "scorecard:write"],
   viewer: ["interview:view", "report:view"],
 };
 

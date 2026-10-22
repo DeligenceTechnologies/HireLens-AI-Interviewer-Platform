@@ -19,6 +19,8 @@ import { listRounds } from "@/lib/services/rounds";
 import { applyUrl, listApplications } from "@/lib/services/applications";
 import { ApplyLinkCard } from "@/components/applications/apply-link-card";
 import { ApplicationsTable } from "@/components/applications/applications-table";
+import { JobPipeline } from "@/components/hiring/job-pipeline";
+import { getJobPipeline } from "@/lib/services/pipeline";
 
 export default async function JobPage(props: PageProps<"/jobs/[jobId]">) {
   const auth = await requireAuth();
@@ -27,10 +29,11 @@ export default async function JobPage(props: PageProps<"/jobs/[jobId]">) {
   const job = await getJob(auth.orgId, jobId);
   if (!job) notFound();
   const canSeeCandidates = can(auth.role, "candidate:view");
-  const [interviews, applications, rounds] = await Promise.all([
+  const [interviews, applications, rounds, pipeline] = await Promise.all([
     listInterviews(auth.orgId, { jobId }),
     canSeeCandidates ? listApplications(auth.orgId, jobId) : Promise.resolve([]),
     listRounds(auth.orgId, jobId),
+    canSeeCandidates ? getJobPipeline(auth.orgId, jobId) : Promise.resolve(null),
   ]);
   const screening = applications.some((a) => a.screening_status === "pending" || a.screening_status === "processing");
   const newCount = applications.filter((a) => a.status === "new").length;
@@ -63,9 +66,18 @@ export default async function JobPage(props: PageProps<"/jobs/[jobId]">) {
             <ApplicationsTable rows={applications.map((a) => ({ ...a, created_at: a.created_at.toISOString() }))} />
           </section>
           )}
+          {pipeline && pipeline.rows.length > 0 && (
+            <section className="rounded-xl border bg-card">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4">
+                <h2 className="font-semibold">Candidates <span className="ml-1 text-sm font-normal text-muted-foreground">{pipeline.rows.length}</span></h2>
+                <span className="text-xs text-muted-foreground">Open a candidate to mark rounds and shortlist.</span>
+              </div>
+              <JobPipeline rounds={pipeline.rounds} rows={pipeline.rows} />
+            </section>
+          )}
           <section className="rounded-xl border bg-card">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4">
-              <h2 className="font-semibold">Interviews <span className="ml-1 text-sm font-normal text-muted-foreground">{interviews.total}</span></h2>
+              <h2 className="font-semibold">AI interviews <span className="ml-1 text-sm font-normal text-muted-foreground">{interviews.total}</span></h2>
               <div className="flex gap-2">
                 {interviews.total > 1 && <Link href={`/jobs/${job.id}/compare`} className={buttonVariants({ variant: "outline" })}><BarChart3 /> Compare</Link>}
                 {can(auth.role, "interview:write") && job.status !== "closed" && <InviteDialog jobId={job.id} />}
@@ -123,8 +135,10 @@ export default async function JobPage(props: PageProps<"/jobs/[jobId]">) {
                   <li key={r.id} className="flex gap-3">
                     <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">{i + 1}</span>
                     <div className="min-w-0 text-sm">
-                      <p className="font-medium">{r.name}</p>
-                      {r.template_id
+                      <p className="font-medium"><span>{r.name}</span> <span className="ml-1 rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-normal text-muted-foreground">{r.kind === "human" ? "Human" : "AI"}</span></p>
+                      {r.kind === "human"
+                        ? <p className="text-xs text-muted-foreground">Assess: {r.criteria.join(", ")}</p>
+                        : r.template_id
                         ? <Link href={`/templates/${r.template_id}`} className="text-xs text-primary hover:underline">{r.template_name} · {r.minutes} min</Link>
                         : <p className="text-xs text-destructive">No template: edit the job to choose one</p>}
                       <p className="text-xs text-muted-foreground">{r.completed} completed · {r.interviews} invited</p>

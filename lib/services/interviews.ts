@@ -12,6 +12,7 @@ import type { SectionEvaluation } from "@/lib/validation/ai-schemas";
 import { readSettings } from "./org-settings";
 import { assertQuotaAvailable, COUNTED_STATUSES } from "./quota";
 import { isOpen, MAX_ROUNDS } from "./rounds";
+import { ensurePipeline } from "./pipeline";
 
 export type InterviewListRow = {
   id: string;
@@ -101,9 +102,10 @@ export async function createInterview(orgId: string, userId: string, input: Crea
     // Which round (and so which template) is this interview for?
     let round: { id: string | null; name: string; template_id: string | null };
     if (input.roundId) {
-      const [r] = await tx<{ id: string; name: string; template_id: string | null }[]>`
-        select id, name, template_id from job_rounds where id = ${input.roundId} and job_id = ${job.id}`;
+      const [r] = await tx<{ id: string; name: string; template_id: string | null; kind: string }[]>`
+        select id, name, template_id, kind from job_rounds where id = ${input.roundId} and job_id = ${job.id}`;
       if (!r) throw new ApiError(404, "Interview round not found");
+      if (r.kind === "human") throw new ApiError(400, `${r.name} is a human interview round: schedule it instead of sending an AI interview.`);
       round = r;
     } else if (input.templateId) {
       const [t] = await tx<{ id: string; name: string }[]>`select id, name from interview_templates where id = ${input.templateId} and organization_id = ${orgId}`;
@@ -125,8 +127,8 @@ export async function createInterview(orgId: string, userId: string, input: Crea
         select r.id, r.name, r.template_id, exists (
           select 1 from interviews i where i.round_id = r.id and i.candidate_id = ${cand.id} and i.status::text = any(${COUNTED_STATUSES})
         ) as done
-        from job_rounds r where r.job_id = ${job.id} order by r.sort_order, r.created_at`;
-      if (!rounds.length) throw new ApiError(400, "Add an interview round to this job first.");
+        from job_rounds r where r.job_id = ${job.id} and r.kind = 'ai' order by r.sort_order, r.created_at`;
+      if (!rounds.length) throw new ApiError(400, "Add an AI interview round to this job first.");
       round = rounds.find((r) => !r.done) ?? rounds[rounds.length - 1];
     }
     const templateId = round.template_id;
@@ -158,6 +160,7 @@ export async function createInterview(orgId: string, userId: string, input: Crea
       values (${orgId}, ${job.id}, ${cand.id}, ${templateId}, ${round.id}, ${round.name}, ${attempt}, ${hashToken(token)},
               now() + make_interval(days => ${settings.invite_expiry_days}), 'created', ${userId})
       returning id`;
+    await ensurePipeline(tx, orgId, job.id, cand.id);
     for (const [i, s] of sections.entries()) {
       await tx`insert into interview_sections (organization_id, interview_id, template_section_id, sort_order, name, objective, config)
         values (${orgId}, ${iv.id}, ${s.id}, ${i}, ${s.name}, ${s.objective}, ${json({
@@ -286,13 +289,14 @@ export async function getInterviewDetail(orgId: string, interviewId: string) {
       consent_timestamp: Date | null; consent_version: string | null; interview_plan: StoredPlan | null; processing_error: string | null;
       token_expires_at: Date | null; updated_at: Date; candidate_id: string; candidate_name: string; candidate_email: string; job_id: string; job_title: string;
       template_name: string | null; round_name: string | null; attempt: number;
+      decision: "qualified" | "not_qualified" | "on_hold" | null; decision_note: string | null; decided_at: Date | null; decided_by_name: string | null;
     }[]>`
       select i.id, i.status, i.plan_status, i.plan_error, i.created_at, i.invited_at, i.started_at, i.completed_at, i.duration_seconds, i.round_name, i.attempt,
         i.consent_given, i.consent_timestamp, i.consent_version, i.interview_plan, i.processing_error, i.token_expires_at, i.updated_at,
         c.id as candidate_id, c.name as candidate_name, c.email as candidate_email, j.id as job_id, j.title as job_title,
-        t.name as template_name
+        t.name as template_name, i.decision, i.decision_note, i.decided_at, du.name as decided_by_name
       from interviews i join candidates c on c.id = i.candidate_id join jobs j on j.id = i.job_id
-      left join interview_templates t on t.id = i.template_id
+      left join interview_templates t on t.id = i.template_id left join users du on du.id = i.decided_by
       where i.id = ${interviewId} and i.organization_id = ${orgId}`;
     if (!iv) return null;
     const sections = await tx<{ id: string; sort_order: number; name: string; objective: string; status: string; start_ms: number | null; end_ms: number | null; evaluation_status: string | null; evaluation: (SectionEvaluation & { source?: string }) | null; config: { scoring_enabled: boolean; evaluation_criteria: string[]; duration_minutes: number } }[]>`

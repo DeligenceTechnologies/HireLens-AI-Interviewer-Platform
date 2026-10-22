@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { api } from "@/lib/client/api";
 import { cn } from "@/lib/utils";
 
-type Round = { id: string; name: string; template_id: string | null; template_name: string | null; minutes: number };
+type Round = { id: string; name: string; kind?: "ai" | "human"; template_id: string | null; template_name: string | null; minutes: number };
 type State = { completedAt: string | null; completedCount: number; pending: boolean; started: number };
 type Template = { id: string; name: string; minutes: number };
 
@@ -44,13 +44,17 @@ export function RoundPicker({ jobId, candidateId, candidateName, onChange }: {
   const [saveAsRound, setSaveAsRound] = useState(false);
   const [roundName, setRoundName] = useState("");
   const [reason, setReason] = useState("");
+  const [humanRounds, setHumanRounds] = useState(0);
 
   useEffect(() => {
     if (!jobId) return;
     let live = true;
     api<{ rounds: Round[]; states: Record<string, State>; templates: Template[] }>(`/api/jobs/${jobId}/rounds${candidateId ? `?candidateId=${candidateId}` : ""}`)
-      .then((d) => {
+      .then((all) => {
         if (!live) return;
+        // Human rounds are scheduled from the candidate's profile, not sent as AI interviews.
+        const d = { ...all, rounds: all.rounds.filter((r) => r.kind !== "human") };
+        setHumanRounds(all.rounds.length - d.rounds.length);
         setData(d);
         // Default: the first round this candidate hasn't completed and isn't waiting on.
         const next = d.rounds.find((r) => !d.states[r.id]?.completedCount && !d.states[r.id]?.pending) ?? d.rounds[0];
@@ -100,6 +104,7 @@ export function RoundPicker({ jobId, candidateId, candidateName, onChange }: {
             </label>
           );
         })}
+        {humanRounds > 0 && <p className="text-xs text-muted-foreground">This job also has {humanRounds} human interview round{humanRounds === 1 ? "" : "s"}: schedule {humanRounds === 1 ? "it" : "them"} from the candidate&apos;s profile.</p>}
         <label className={cn("flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm", selected === OTHER ? "border-primary bg-primary/5" : "hover:bg-muted/50")}>
           <input type="radio" name="round" className="accent-[var(--primary)]" checked={selected === OTHER} onChange={() => setSelected(OTHER)} />
           <span className="font-medium">Another template…</span>

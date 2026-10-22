@@ -45,7 +45,7 @@ export function JobForm({ initial, jobId, templates }: { initial?: JobFormValue;
   const [v, setV] = useState<JobFormValue>(initial ?? {
     title: "", description: "", location: "", employment_type: "full_time", experience_min: null, experience_max: null,
     required_skills: [], preferred_skills: [], responsibilities: [],
-    rounds: [{ key: newRoundKey(), name: "Screening", template_id: templates.find((t) => t.is_default)?.id ?? templates[0]?.id ?? "" }], status: "active",
+    rounds: [{ key: newRoundKey(), name: "Screening", kind: "ai", template_id: templates.find((t) => t.is_default)?.id ?? templates[0]?.id ?? "", criteria: [], guide: "" }], status: "active",
   });
   const [respText, setRespText] = useState((initial?.responsibilities ?? []).join("\n"));
   const [busy, setBusy] = useState(false);
@@ -59,7 +59,10 @@ export function JobForm({ initial, jobId, templates }: { initial?: JobFormValue;
     setErrors({});
     const payload = {
       ...v, location: v.location || null, responsibilities: respText.split("\n").map((s) => s.replace(/^[-*•]\s*/, "").trim()).filter(Boolean),
-      rounds: v.rounds.map(({ id, name, template_id }) => ({ ...(id ? { id } : {}), name: name.trim(), template_id })),
+      rounds: v.rounds.map(({ id, name, kind, template_id, criteria, guide }) => ({
+        ...(id ? { id } : {}), name: name.trim(), kind,
+        ...(kind === "human" ? { template_id: null, criteria, guide: guide.trim() || null } : { template_id }),
+      })),
     };
     try {
       const res = await api<{ id?: string }>(jobId ? `/api/jobs/${jobId}` : "/api/jobs", { method: jobId ? "PUT" : "POST", body: payload });
@@ -124,7 +127,7 @@ export function JobForm({ initial, jobId, templates }: { initial?: JobFormValue;
           <Textarea id="resp" rows={4} value={respText} onChange={(e) => setRespText(e.target.value)} />
         </div>
       </Section>
-      <Section title="Interview rounds" required description="The interviews candidates go through for this job, in order. Each round uses its own template (sections, timing, questions and follow-ups).">
+      <Section title="Interview rounds" required description="The interviews candidates go through for this job, in order. An AI round uses a template (sections, timing, questions and follow-ups); a human round is scheduled with your team, who rate the candidate on a scorecard.">
         <RoundsEditor value={v.rounds} onChange={(r) => set("rounds", r)} templates={templates}
           error={Object.entries(errors).find(([k]) => k.startsWith("rounds"))?.[1]} />
         <div className="space-y-1.5">

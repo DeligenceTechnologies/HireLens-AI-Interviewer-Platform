@@ -21,8 +21,8 @@ export default async function EditJobPage(props: PageProps<"/jobs/[jobId]/edit">
         experience_min: job.experience_min, experience_max: job.experience_max, required_skills: job.required_skills,
         preferred_skills: job.preferred_skills, responsibilities: job.responsibilities, status: job.status,
         rounds: rounds.length
-          ? rounds.map((r) => ({ id: r.id, key: r.id, name: r.name, template_id: r.template_id ?? "" }))
-          : [{ key: "first", name: "Screening", template_id: templates.find((t) => t.is_default)?.id ?? templates[0]?.id ?? "" }],
+          ? rounds.map((r) => ({ id: r.id, key: r.id, name: r.name, kind: r.kind, template_id: r.template_id ?? "", criteria: r.criteria, guide: r.guide ?? "" }))
+          : [{ key: "first", name: "Screening", kind: "ai" as const, template_id: templates.find((t) => t.is_default)?.id ?? templates[0]?.id ?? "", criteria: [], guide: "" }],
       }} />
     </>
   );

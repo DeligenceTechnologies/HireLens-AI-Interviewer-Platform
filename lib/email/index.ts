@@ -107,6 +107,19 @@ ${input.companyName} hiring team`,
       text: `${input.inviter} invited you to join ${input.orgName} as ${input.role}.\n\nAccept the invitation: ${input.link}\n\nThis link expires in 7 days.`,
     };
   },
+  humanInterview(input: {
+    kind: "invite" | "rescheduled" | "cancelled"; name: string; jobTitle: string; companyName: string; roundName: string;
+    when: string; where: string; with: string; message: string | null; reason: string | null; link?: string; team?: boolean;
+  }) {
+    const what = input.team ? `${input.roundName} interview with ${input.with} (${input.jobTitle})` : `${input.roundName} interview for ${input.jobTitle} at ${input.companyName}`;
+    const subject = input.kind === "cancelled" ? `Cancelled: ${what}` : input.kind === "rescheduled" ? `New time: ${what}` : input.team ? `You're interviewing: ${what}` : `Interview invitation: ${what}`;
+    const lead = input.kind === "cancelled" ? `The ${what} has been cancelled.${input.reason ? `\nReason: ${input.reason}` : ""}`
+      : input.kind === "rescheduled" ? `The ${what} has moved to a new time.${input.reason ? `\nReason: ${input.reason}` : ""}`
+      : input.team ? `You're on the panel for the ${what}.` : `${input.companyName} would like to invite you to the ${input.roundName} interview for the ${input.jobTitle} role.`;
+    const details = input.kind === "cancelled" ? "" : `\n\nWhen: ${input.when}\nWhere: ${input.where}\nWith: ${input.with}${input.message ? `\n\n${input.message}` : ""}`;
+    const tail = input.team && input.link ? `\n\nInterview guide and scorecard: ${input.link}` : input.kind === "cancelled" ? "" : "\n\nIf this time doesn't work for you, please reply to let us know.";
+    return { subject, text: `Hi ${input.name},\n\n${lead}${details}${tail}\n\n${input.companyName}` };
+  },
   verifyEmail(input: { name: string; link: string }) {
     return {
       subject: "Confirm your email to start your PickMyHire.ai trial",

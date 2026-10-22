@@ -81,7 +81,7 @@ export async function createJob(orgId: string, userId: string, input: JobInput) 
         required_skills, preferred_skills, responsibilities, interview_template_id, status, created_by, parse_status)
       values (${orgId}, ${input.title}, ${input.description}, ${input.location}, ${input.employment_type}, ${input.experience_min},
         ${input.experience_max}, ${json(input.required_skills)}, ${json(input.preferred_skills)}, ${json(input.responsibilities)},
-        ${input.rounds[0].template_id}, ${input.status}, ${userId}, ${input.description ? "pending" : null})
+        ${input.rounds.find((r) => r.kind !== "human")?.template_id ?? null}, ${input.status}, ${userId}, ${input.description ? "pending" : null})
       returning id`;
     await saveRounds(tx, orgId, row.id, input.rounds);
     await audit(tx, { orgId, userId, action: "job.created", entityType: "job", entityId: row.id });

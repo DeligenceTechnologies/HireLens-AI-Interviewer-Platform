@@ -13,9 +13,14 @@ import { can } from "@/lib/auth/permissions";
 import { requireAuth } from "@/lib/auth/session";
 import { roundLabel } from "@/components/interviews/interview-table";
 import { formatDate } from "@/lib/format";
+import { formatInZone } from "@/lib/hiring";
 import { isUuid } from "@/lib/ids";
 import { getCandidate } from "@/lib/services/candidates";
 import { listJobs } from "@/lib/services/jobs";
+import { CandidatePipelines } from "@/components/hiring/candidate-pipeline";
+import { env } from "@/lib/env";
+import { listPanelCandidates } from "@/lib/services/human-interviews";
+import { getCandidatePipelines } from "@/lib/services/pipeline";
 
 export default async function CandidatePage(props: PageProps<"/candidates/[candidateId]">) {
   const auth = await requireAuth("candidate:view");
@@ -23,7 +28,12 @@ export default async function CandidatePage(props: PageProps<"/candidates/[candi
   if (!isUuid(candidateId)) notFound();
   const c = await getCandidate(auth.orgId, candidateId);
   if (!c) notFound();
-  const jobs = can(auth.role, "interview:write") ? (await listJobs(auth.orgId, { status: "active" })) : [];
+  const canSchedule = can(auth.role, "interview:write");
+  const [jobs, pipelines, members] = await Promise.all([
+    canSchedule ? listJobs(auth.orgId, { status: "active" }) : Promise.resolve([]),
+    getCandidatePipelines(auth.orgId, candidateId),
+    canSchedule ? listPanelCandidates(auth.orgId) : Promise.resolve([]),
+  ]);
   const parsing = c.parse_status === "pending" || c.parse_status === "processing";
   const canWrite = can(auth.role, "candidate:write");
   return (
@@ -42,6 +52,13 @@ export default async function CandidatePage(props: PageProps<"/candidates/[candi
           {jobs.length > 0 && <InviteDialog candidateId={c.id} candidateName={c.name} jobs={jobs.map((j) => ({ id: j.id, label: j.title }))} triggerLabel="Invite to interview" />}
         </>}
       />
+      {pipelines.length > 0 && (
+        <div className="mb-6 space-y-3">
+          <h2 className="font-semibold">Hiring progress</h2>
+          <CandidatePipelines pipelines={pipelines} candidateId={c.id} candidateName={c.name} canDecide={can(auth.role, "decision:write")} canSchedule={canSchedule}
+            members={members.map((m) => ({ user_id: m.user_id, name: m.name, role: m.role }))} emailLive={env().EMAIL_PROVIDER !== "log"} />
+        </div>
+      )}
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="rounded-xl border bg-card p-5 lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
@@ -72,10 +89,10 @@ export default async function CandidatePage(props: PageProps<"/candidates/[candi
               <ul className="divide-y">
                 {c.interviews.map((i) => (
                   <li key={i.id}>
-                    <Link href={`/interviews/${i.id}`} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-muted/40">
+                    <Link href={i.kind === "human" ? `/interviews/human/${i.id}` : `/interviews/${i.id}`} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-muted/40">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{i.job_title}</p>
-                        <p className="text-xs text-muted-foreground">{[roundLabel(i), formatDate(i.created_at)].filter(Boolean).join(" · ")}</p>
+                        <p className="text-xs text-muted-foreground">{[i.kind === "human" ? "Human" : "AI", roundLabel(i), i.kind === "human" && i.scheduled_at && i.timezone ? formatInZone(i.scheduled_at, i.timezone) : formatDate(i.created_at)].filter(Boolean).join(" · ")}</p>
                       </div>
                       <StatusBadge status={i.status} />
                     </Link>

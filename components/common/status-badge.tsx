@@ -26,6 +26,9 @@ const STATUS: Record<string, { label: string; tone: Tone }> = {
   cancelled: { label: "Cancelled", tone: "neutral" },
   expired: { label: "Expired", tone: "neutral" },
   failed: { label: "Failed", tone: "danger" },
+  // human interviews
+  scheduled: { label: "Scheduled", tone: "info" },
+  no_show: { label: "No-show", tone: "warning" },
   // jobs
   draft: { label: "Draft", tone: "neutral" },
   active: { label: "Active", tone: "success" },

@@ -14,6 +14,7 @@ import { getInterviewDetail } from "@/lib/services/interviews";
 import { listInterviewFeedback } from "@/lib/services/feedback";
 import { getSettings } from "@/lib/services/workspace";
 import { recoverIfStale } from "@/lib/interview/processing";
+import { DecisionControl } from "@/components/hiring/decision-control";
 
 /** Shared server page for /interviews/[id] and its tab sub-routes. */
 export async function InterviewPage({ params, tab }: { params: Promise<{ interviewId: string }>; tab: ViewerTab }) {
@@ -41,6 +42,18 @@ export async function InterviewPage({ params, tab }: { params: Promise<{ intervi
         </>}
         actions={<InterviewActions id={detail.id} status={detail.status} canWrite={can(auth.role, "interview:write")} canDelete={can(auth.role, "data:delete")} canRegenerate={can(auth.role, "report:regenerate")} />}
       />
+      {["completed", "processing", "report_ready"].includes(detail.status) && (can(auth.role, "decision:write") || detail.decision) && (
+        <section className="mb-6 flex flex-wrap items-start justify-between gap-4 rounded-xl border bg-card px-5 py-4" aria-label="Round decision">
+          <div className="max-w-md">
+            <h2 className="font-semibold">Round decision{detail.round_name ? `: ${detail.round_name}` : ""}</h2>
+            <p className="text-xs text-muted-foreground">The AI report is advice. Your team decides whether the candidate moves on.</p>
+          </div>
+          <div className="min-w-0 sm:max-w-md">
+            <DecisionControl endpoint={`/api/interviews/${detail.id}/decision`} decision={detail.decision} note={detail.decision_note} decidedBy={detail.decided_by_name}
+              decidedOn={detail.decided_at ? formatDate(detail.decided_at) : null} canEdit={can(auth.role, "decision:write")} />
+          </div>
+        </section>
+      )}
       <InterviewViewer detail={detail} initialTab={tab} showScores={settings.show_scores} canViewRecording={can(auth.role, "recording:view")} canRegenerate={can(auth.role, "report:regenerate")} canViewCandidates={can(auth.role, "candidate:view")} feedback={feedback} />
     </>
   );

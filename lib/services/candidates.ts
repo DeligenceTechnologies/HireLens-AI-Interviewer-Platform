@@ -58,9 +58,16 @@ export async function getCandidate(orgId: string, candidateId: string) {
     if (!c) return null;
     const documents = await tx<{ id: string; file_name: string; mime_type: string; file_size: number; created_at: Date }[]>`
       select id, file_name, mime_type, file_size, created_at from candidate_documents where candidate_id = ${candidateId} order by created_at desc`;
-    const interviews = await tx<{ id: string; status: string; job_title: string; job_id: string; created_at: Date; completed_at: Date | null; round_name: string | null; attempt: number }[]>`
-      select i.id, i.status, j.title as job_title, j.id as job_id, i.created_at, i.completed_at, i.round_name, i.attempt
-      from interviews i join jobs j on j.id = i.job_id where i.candidate_id = ${candidateId} order by j.title, i.created_at desc`;
+    // AI and human interviews together; human ones are dated by when they're scheduled.
+    const interviews = await tx<{ id: string; kind: "ai" | "human"; status: string; job_title: string; job_id: string; created_at: Date; completed_at: Date | null; round_name: string | null; attempt: number; scheduled_at: Date | null; timezone: string | null }[]>`
+      select * from (
+        select i.id, 'ai' as kind, i.status::text as status, j.title as job_title, j.id as job_id, i.created_at, i.completed_at, i.round_name, i.attempt,
+          null::timestamptz as scheduled_at, null::text as timezone
+        from interviews i join jobs j on j.id = i.job_id where i.candidate_id = ${candidateId}
+        union all
+        select h.id, 'human', h.status, j.title, j.id, h.created_at, null, h.round_name, h.attempt, h.scheduled_at, h.timezone
+        from human_interviews h join jobs j on j.id = h.job_id where h.candidate_id = ${candidateId}
+      ) x order by job_title, coalesce(scheduled_at, created_at) desc`;
     return { ...c, documents, interviews };
   });
 }

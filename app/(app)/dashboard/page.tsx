@@ -9,6 +9,8 @@ import { can } from "@/lib/auth/permissions";
 import { requireAuth } from "@/lib/auth/session";
 import { getDashboard } from "@/lib/services/workspace";
 import { getQuotaStatus } from "@/lib/services/quota";
+import { listMyHumanInterviews } from "@/lib/services/human-interviews";
+import { UpcomingHumanInterviews } from "@/components/hiring/upcoming-human";
 import { timeAgo } from "@/lib/format";
 
 export const metadata = { title: "Dashboard" };
@@ -16,9 +18,10 @@ export const metadata = { title: "Dashboard" };
 export default async function DashboardPage(props: PageProps<"/dashboard">) {
   const auth = await requireAuth();
   const sp = await props.searchParams;
-  const [{ stats, recent, attention }, quota] = await Promise.all([
+  const [{ stats, recent, attention }, quota, human] = await Promise.all([
     getDashboard(auth.orgId, { includeCandidateData: can(auth.role, "candidate:view") }),
     getQuotaStatus(auth.orgId),
+    listMyHumanInterviews(auth.orgId, auth),
   ]);
   const completionRate = stats.started ? Math.round((stats.completed / stats.started) * 100) : null;
   return (
@@ -40,6 +43,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
           </span>
         </p>
       )}
+      <UpcomingHumanInterviews rows={human} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Active jobs" value={stats.active_jobs} icon={Briefcase} />
         <StatCard label="Candidates" value={stats.candidates} icon={Users} />
