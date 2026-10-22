@@ -143,9 +143,23 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
     return () => window.removeEventListener("beforeunload", warn);
   }, [stage]);
 
-  useEffect(() => () => {
-    engine.current?.close();
+  // Turn the camera and microphone off (the browser's camera light and mic
+  // indicator go out) and stop the level meter.
+  const stopMedia = () => {
     camera.current?.getTracks().forEach((t) => t.stop());
+    if (video.current) video.current.srcObject = null;
+    meterCtx.current?.close().catch(() => {});
+    meterCtx.current = null;
+  };
+
+  const unmounted = useRef(false);
+  useEffect(() => {
+    unmounted.current = false;
+    return () => {
+      unmounted.current = true;
+      engine.current?.close();
+      stopMedia();
+    };
   }, []);
 
   // The interviewer's voice is recorded on its own (not mixed into the video) and
@@ -187,13 +201,16 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
     // Never keep the candidate waiting indefinitely; the server seals any
     // chunks that arrived even if this final save times out.
     const saves = [recorder.current, voiceRecorder.current].map((r) => r?.finish().catch(() => false));
+    // finish() has already stopped the recorders (their last piece is kept), so the
+    // camera and microphone go off now, not after the upload.
+    stopMedia();
+    logEvent("media_stopped");
     await Promise.race([Promise.all(saves), new Promise((r) => setTimeout(r, SAVE_WAIT_MS))]);
     try {
       await post(`/api/public/interview/${token}/complete`, { reason }, { retries: 8 });
     } catch { /* the server also finalizes abandoned interviews */ }
-    camera.current?.getTracks().forEach((t) => t.stop());
     router.replace(`/interview/${token}/completed`);
-  }, [router, token]);
+  }, [router, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ask = useCallback(async (u: Utterance) => {
     current.current = u;
@@ -394,12 +411,13 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
         audio: AUDIO,
       });
       camera.current = media;
+      if (unmounted.current) { stopMedia(); return; } // left the page while the camera was starting
       watchMic(media);
       if (video.current) video.current.srcObject = media;
       startMicMeter(media);
 
       const start = await post<Payload>(`/api/public/interview/${token}/start`, {}, { retries: 3 });
-      if (start.finished) return router.replace(`/interview/${token}/completed`);
+      if (start.finished) { stopMedia(); return router.replace(`/interview/${token}/completed`); }
       clockBase.current = { startedAt: new Date(start.started_at!).getTime(), skew: start.server_now - nowMs() };
       setProgress(start.progress);
       logEvent(start.resumed ? "session_resumed_client" : "session_started_client", { engine: demoMode ? "browser" : "openai" });
@@ -416,6 +434,10 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
       setStage("live");
       if (start.utterance) await ask(start.utterance);
     } catch (err) {
+      // Don't leave the camera on behind the error (a retry asks for it again).
+      engine.current?.close();
+      engine.current = null;
+      stopMedia();
       const e = err as Error & { name?: string };
       setError(e.name === "NotAllowedError" ? "Camera and microphone access is required. Allow access in your browser and try again." : e.message || "We couldn't start the interview.");
       setStage("error");

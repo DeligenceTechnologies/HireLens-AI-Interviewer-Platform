@@ -50,6 +50,16 @@ test("recruiter to candidate to report", async ({ page, browser }) => {
   // 4. Candidate flow in a separate browser context (no recruiter cookies)
   const ctx = await browser.newContext({ permissions: ["camera", "microphone"] });
   const cand = await ctx.newPage();
+  // Keep a handle on every camera/microphone track the page opens, to check they're all turned off on time.
+  await cand.addInitScript(() => {
+    const w = window as unknown as { __tracks: MediaStreamTrack[] };
+    w.__tracks = [];
+    const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async (c) => { const s = await gum(c); w.__tracks.push(...s.getTracks()); return s; };
+    const clone = MediaStreamTrack.prototype.clone;
+    MediaStreamTrack.prototype.clone = function () { const t = clone.call(this); w.__tracks.push(t); return t; };
+  });
+  const liveTracks = () => cand.evaluate(() => (window as unknown as { __tracks: MediaStreamTrack[] }).__tracks.filter((t) => t.readyState === "live").map((t) => t.kind));
   await cand.goto(link);
   await expect(cand.getByRole("heading", { name: /welcome/i })).toBeVisible();
   await cand.getByRole("link", { name: "Get started" }).click();
@@ -58,7 +68,10 @@ test("recruiter to candidate to report", async ({ page, browser }) => {
   await expect(cand).toHaveURL(/device-check/);
   // Headless Chromium's fake capture devices can stall on the very first request; warm them up.
   await cand.evaluate(async () => {
-    try { await Promise.race([navigator.mediaDevices.getUserMedia({ audio: true, video: true }), new Promise((r) => setTimeout(r, 5000))]); } catch { /* ignore */ }
+    try {
+      const s = await Promise.race([navigator.mediaDevices.getUserMedia({ audio: true, video: true }), new Promise<null>((r) => setTimeout(() => r(null), 5000))]);
+      s?.getTracks().forEach((t) => t.stop());
+    } catch { /* ignore */ }
   });
   await expect(cand.getByText(/We can hear you/)).toBeVisible({ timeout: 30_000 });
   await expect(cand.getByText("Test recording worked")).toBeVisible({ timeout: 20_000 });
@@ -67,12 +80,14 @@ test("recruiter to candidate to report", async ({ page, browser }) => {
   await expect(cand.getByText(/being prepared/)).toBeHidden({ timeout: 60_000 });
   await cand.getByRole("button", { name: "Continue to interview" }).click();
   await expect(cand).toHaveURL(/session/);
+  expect(await liveTracks()).toEqual([]); // the device check let go of the camera and microphone
   await cand.getByRole("button", { name: "Start interview" }).click();
   // After the closing line the candidate is told the interview is over while the video saves.
+  // The camera and microphone are already off while the recording is still saving.
   const sawSavingScreen = cand.getByText("Interview complete").waitFor({ timeout: 200_000 }).then(async () => {
     if (process.env.E2E_SCREENSHOTS) await cand.screenshot({ path: "test-results/saving-screen.png" }).catch(() => {});
-    return true;
-  }, () => false);
+    return liveTracks().catch(() => ["page closed"]);
+  }, () => ["no saving screen"]);
 
   for (let turn = 0; turn < 25; turn++) {
     const answer = cand.locator("#typed");
@@ -108,7 +123,7 @@ test("recruiter to candidate to report", async ({ page, browser }) => {
   }
   await expect(cand).toHaveURL(/completed/, { timeout: 120_000 });
   await expect(cand.getByRole("heading", { name: /Thank you/ })).toBeVisible();
-  expect(await sawSavingScreen).toBe(true);
+  expect(await sawSavingScreen).toEqual([]);
   await ctx.close();
 
   // 5. Recruiter reviews transcript and report

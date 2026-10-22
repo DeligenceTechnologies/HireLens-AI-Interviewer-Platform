@@ -46,9 +46,12 @@ export function DeviceCheck({ token, planReady }: { token: string; planReady: bo
     let ctx: AudioContext | null = null;
     let raf = 0;
     let local: MediaStream | null = null;
+    let closed = false;
     let stopTest = () => {};
     navigator.mediaDevices?.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: { echoCancellation: true, noiseSuppression: true } })
       .then((s) => {
+        // The page closed while the camera was starting: turn it straight off.
+        if (closed) { s.getTracks().forEach((t) => t.stop()); return; }
         local = s;
         setStream(s);
         setCam(s.getVideoTracks().length ? "ok" : "fail");
@@ -75,7 +78,7 @@ export function DeviceCheck({ token, planReady }: { token: string; planReady: bo
         setMic("fail");
         setMediaError(e.name === "NotAllowedError" ? "Camera/microphone permission was blocked. Allow access in your browser's address bar, then reload." : e.name === "NotFoundError" ? "No camera or microphone was found." : "We couldn't access your camera or microphone.");
       });
-    return () => { stopTest(); cancelAnimationFrame(raf); ctx?.close().catch(() => {}); local?.getTracks().forEach((t) => t.stop()); };
+    return () => { closed = true; stopTest(); cancelAnimationFrame(raf); ctx?.close().catch(() => {}); local?.getTracks().forEach((t) => t.stop()); };
   }, [token]);
 
   useEffect(() => { if (video.current && stream) video.current.srcObject = stream; }, [stream]);
