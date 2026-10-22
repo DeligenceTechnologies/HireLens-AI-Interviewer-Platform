@@ -113,6 +113,14 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   return { userId: row.user_id, email: row.email, name: row.name, isPlatformAdmin: row.is_platform_admin, hasCompany: row.has_company };
 });
 
+/** Where a signed-in visitor of the public pages should go back to (null when signed out). */
+export async function getAppLink(): Promise<{ href: string; label: string } | null> {
+  const me = await getSessionUser();
+  if (me?.hasCompany) return { href: "/dashboard", label: "Go to dashboard" };
+  if (me?.isPlatformAdmin) return { href: "/admin", label: "Go to admin" };
+  return null;
+}
+
 /** For admin pages: only platform admins; everyone else gets a 404. */
 export async function requirePlatformAdmin(): Promise<SessionUser> {
   const user = await getSessionUser();

@@ -5,6 +5,7 @@ import { Copyright } from "@/components/layout/logo";
 import { DemoVideo } from "@/components/marketing/demo-video";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { DEMO_URL } from "@/lib/marketing";
+import { getAppLink } from "@/lib/auth/session";
 import { getTrialSettings } from "@/lib/services/platform";
 
 export const metadata: Metadata = {
@@ -27,10 +28,10 @@ const CHAPTERS = [
 ];
 
 export default async function DemoPage() {
-  const trial = await getTrialSettings();
+  const [trial, app] = await Promise.all([getTrialSettings(), getAppLink()]);
   return (
     <div className="min-h-screen bg-[#F8FAFD] text-[#0F1F3A]">
-      <SiteHeader trial={trial.enabled} />
+      <SiteHeader trial={trial.enabled} app={app} />
       <main className="mx-auto max-w-5xl px-5 py-14 sm:px-8 sm:py-20">
         <p className="text-center text-sm font-semibold tracking-[0.18em] text-[#0B5BD3] uppercase">Product demo</p>
         <h1 className="mt-3 text-center text-3xl font-bold tracking-tight text-balance sm:text-5xl">See PickMyHire.ai in action</h1>
@@ -57,7 +58,7 @@ export default async function DemoPage() {
             <p className="mt-2 text-[15px] text-[#4A5874]">{trial.enabled ? `Start a free trial (${trial.interviews} interviews for ${trial.days} days), or book a call and we'll walk through your hiring process.` : "Book a call and we'll walk through your hiring process, or request access for your team."}</p>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">
               <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0B5BD3] px-5 py-3 text-sm font-semibold text-white hover:bg-[#0A4FB8]">Book a demo <ArrowRight className="size-4" /></a>
-              <Link href={trial.enabled ? "/signup" : "/#contact"} className="inline-flex items-center justify-center rounded-xl border border-[#CBD7EA] bg-white px-5 py-3 text-sm font-semibold hover:border-[#0B5BD3] hover:text-[#0B5BD3]">{trial.enabled ? "Start free trial" : "Request access"}</Link>
+              <Link href={app?.href ?? (trial.enabled ? "/signup" : "/#contact")} className="inline-flex items-center justify-center rounded-xl border border-[#CBD7EA] bg-white px-5 py-3 text-sm font-semibold hover:border-[#0B5BD3] hover:text-[#0B5BD3]">{app?.label ?? (trial.enabled ? "Start free trial" : "Request access")}</Link>
             </div>
           </section>
         </div>

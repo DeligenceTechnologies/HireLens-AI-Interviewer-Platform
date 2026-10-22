@@ -17,8 +17,11 @@ const NAV = [
   { href: "/#faq", label: "FAQ" },
 ];
 
-/** `trial`: free trials are open, so "Start free trial" is the main button. */
-export function SiteHeader({ trial = false }: { trial?: boolean }) {
+/**
+ * `trial`: free trials are open, so "Start free trial" is the main button.
+ * `app`: the visitor is signed in, so the main button goes back to the app.
+ */
+export function SiteHeader({ trial = false, app = null }: { trial?: boolean; app?: { href: string; label: string } | null }) {
   const [open, setOpen] = useState(false);
   return (
     <header className="sticky top-0 z-40 border-b border-[#E3EAF5]/80 bg-[#F8FAFD]/90 backdrop-blur">
@@ -30,7 +33,12 @@ export function SiteHeader({ trial = false }: { trial?: boolean }) {
           {NAV.map((n) => <a key={n.href} href={n.href} className="hover:text-[#0B5BD3]">{n.label}</a>)}
         </nav>
         <div className="ml-auto flex items-center gap-2 lg:ml-0">
-          {trial ? (
+          {app ? (
+            <>
+              <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="hidden rounded-lg border border-[#CBD7EA] bg-white px-4 py-2 text-sm font-semibold whitespace-nowrap text-[#0F1F3A] hover:border-[#0B5BD3] hover:text-[#0B5BD3] sm:inline-flex">Book a demo</a>
+              <Link href={app.href} className="inline-flex rounded-lg bg-[#0B5BD3] px-4 py-2 text-sm font-semibold whitespace-nowrap text-white shadow-sm hover:bg-[#0A4FB8]">{app.label}</Link>
+            </>
+          ) : trial ? (
             <>
               <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="hidden rounded-lg border border-[#CBD7EA] bg-white px-4 py-2 text-sm font-semibold whitespace-nowrap text-[#0F1F3A] hover:border-[#0B5BD3] hover:text-[#0B5BD3] sm:inline-flex">Book a demo</a>
               <Link href="/signup" className="inline-flex rounded-lg bg-[#0B5BD3] px-4 py-2 text-sm font-semibold whitespace-nowrap text-white shadow-sm hover:bg-[#0A4FB8]">Start free trial</Link>

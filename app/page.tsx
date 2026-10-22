@@ -13,6 +13,7 @@ import { AccessRequestForm } from "@/components/marketing/access-request-form";
 import Image from "next/image";
 import { DEMO_URL } from "@/lib/marketing";
 import { getTrialSettings } from "@/lib/services/platform";
+import { getAppLink } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: { absolute: "PickMyHire.ai · AI video interviews with evidence you can verify" },
@@ -148,12 +149,12 @@ const FAQ = [
 const PRICING_FAQ = "Pricing depends on your hiring volume. Book a demo or contact us and we'll put together a plan for your team.";
 
 export default async function Home() {
-  const trial = await getTrialSettings();
+  const [trial, app] = await Promise.all([getTrialSettings(), getAppLink()]);
   const trialLine = `${trial.interviews} AI interviews free for ${trial.days} days`;
   const faqs = [...FAQ, ["How much does it cost?", trial.enabled ? `You can start with a free trial: ${trialLine}, no credit card needed. After that, ${PRICING_FAQ.charAt(0).toLowerCase()}${PRICING_FAQ.slice(1)}` : PRICING_FAQ]];
   return (
     <div className="min-h-screen bg-[#F8FAFD] text-[#0F1F3A]">
-      <SiteHeader trial={trial.enabled} />
+      <SiteHeader trial={trial.enabled} app={app} />
 
       {/* Hero */}
       <section className="relative overflow-hidden">
@@ -170,9 +171,9 @@ export default async function Home() {
               PickMyHire.ai runs personalized AI video interviews for every candidate and gives your team reports where every assessment links to the exact moment in the transcript and recording.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              {trial.enabled ? (
+              {app || trial.enabled ? (
                 <>
-                  <Link href="/signup" className={BLUE_BTN}>Start free trial <ArrowRight className="size-4" /></Link>
+                  <Link href={app?.href ?? "/signup"} className={BLUE_BTN}>{app?.label ?? "Start free trial"} <ArrowRight className="size-4" /></Link>
                   <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className={GHOST_BTN}>Book a demo</a>
                 </>
               ) : (
@@ -182,7 +183,7 @@ export default async function Home() {
                 </>
               )}
             </div>
-            {trial.enabled && <p className="mt-3 text-sm text-[#5A6A86]">{trialLine} · No credit card · Work email required</p>}
+            {trial.enabled && !app && <p className="mt-3 text-sm text-[#5A6A86]">{trialLine} · No credit card · Work email required</p>}
             <ul className="mt-8 grid gap-2.5 text-sm text-[#3D4D6A] sm:grid-cols-2">
               {["Interviews available 24/7", "Questions tailored to each resume", "Evidence behind every assessment", "Your team makes every decision"].map((t) => (
                 <li key={t} className="flex items-center gap-2"><CheckCircle2 className="size-4 text-[#0B5BD3]" />{t}</li>
@@ -444,10 +445,10 @@ export default async function Home() {
               <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance text-white sm:text-[2.6rem] sm:leading-[1.15]">See PickMyHire.ai on your next open role</h2>
               <p className="mt-5 text-lg leading-relaxed text-[#D6E6FF]">Book a 20-minute demo. We&apos;ll show the full flow, from apply link to evidence-backed report, and talk through pricing for your hiring volume.</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                {trial.enabled && <Link href="/signup" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-[#0B4FB8] hover:bg-[#EAF2FF]">Start free trial <ArrowRight className="size-4" /></Link>}
-                <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className={trial.enabled
+                {(app || trial.enabled) && <Link href={app?.href ?? "/signup"} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-[#0B4FB8] hover:bg-[#EAF2FF]">{app?.label ?? "Start free trial"} <ArrowRight className="size-4" /></Link>}
+                <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className={app || trial.enabled
                   ? "inline-flex items-center justify-center gap-2 rounded-xl border border-white/40 px-6 py-3.5 text-base font-semibold text-white hover:bg-white/10"
-                  : "inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-[#0B4FB8] hover:bg-[#EAF2FF]"}>Book a demo {!trial.enabled && <ArrowRight className="size-4" />}</a>
+                  : "inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-[#0B4FB8] hover:bg-[#EAF2FF]"}>Book a demo {!(app || trial.enabled) && <ArrowRight className="size-4" />}</a>
               </div>
               <div className="flex-1" />
               <p className="mt-8 text-sm text-[#BFD3F5]">{trial.enabled
@@ -479,7 +480,7 @@ export default async function Home() {
           <div>
             <p className="text-sm font-semibold">Contact</p>
             <ul className="mt-4 space-y-2.5 text-sm text-[#5A6A86]">
-              {trial.enabled && <li><Link href="/signup" className="hover:text-[#0B5BD3]">Start free trial</Link></li>}
+              {(app || trial.enabled) && <li><Link href={app?.href ?? "/signup"} className="hover:text-[#0B5BD3]">{app?.label ?? "Start free trial"}</Link></li>}
               <li><a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="hover:text-[#0B5BD3]">Book a demo</a></li>
               <li><a href="#contact" className="hover:text-[#0B5BD3]">Request access</a></li>
             </ul>
