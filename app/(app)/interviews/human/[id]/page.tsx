@@ -18,7 +18,54 @@ import { getHumanInterview, inviteMessage, listPanelCandidates } from "@/lib/ser
 
 export const metadata = { title: "Human interview" };
 
+type Scorecard = Awaited<ReturnType<typeof getHumanInterview>> extends infer H ? H extends { scorecards: (infer S)[] } ? S : never : never;
+
+function ScorecardView({ s, showName = true }: { s: Scorecard; showName?: boolean }) {
+  return (
+    <div className="space-y-2 rounded-lg border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {showName ? <p className="font-medium">{s.name}</p> : <span />}
+        <span className="flex flex-wrap items-center gap-1.5">
+          {s.edited_after_decision && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-900">Edited after decision</span>}
+          {s.recommendation && <DecisionBadge decision={s.recommendation} />}
+        </span>
+      </div>
+      <ul className="space-y-1.5">
+        {s.ratings.map((r) => (
+          <li key={r.criterion} className="text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2"><span>{r.criterion}</span><Stars value={r.rating} label={`${s.name}'s rating for ${r.criterion}`} /></div>
+            {r.comment && <p className="text-xs text-muted-foreground">{r.comment}</p>}
+          </li>
+        ))}
+      </ul>
+      {s.notes && <p className="whitespace-pre-wrap rounded-md bg-muted/50 px-3 py-2 text-sm">{s.notes}</p>}
+      {s.versions.length > 0 && (
+        <details className="text-sm">
+          <summary className="cursor-pointer text-xs font-medium text-primary">Earlier version{s.versions.length === 1 ? "" : `s (${s.versions.length})`}</summary>
+          <ol className="mt-2 space-y-2">
+            {[...s.versions].reverse().map((v, i) => (
+              <li key={i} className="rounded-md bg-muted/40 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Replaced {formatDate(v.replaced_at, true)}{v.recommendation ? ` · recommended ${DECISION_LABEL[v.recommendation]}` : ""}</p>
+                <p className="mt-1 text-xs">{v.ratings.map((r) => `${r.criterion}: ${r.rating ?? "–"}/5`).join(" · ")}</p>
+                {v.notes && <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{v.notes}</p>}
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
+    </div>
+  );
+}
+
 const HISTORY_LABEL: Record<string, string> = { scheduled: "Scheduled", rescheduled: "Rescheduled", cancelled: "Cancelled", completed: "Marked completed", no_show: "Marked no-show", reopened: "Moved back to scheduled" };
+
+type HistoryEntry = { type: string; to?: string; decision?: keyof typeof DECISION_LABEL | null; detail?: string; afterDecision?: boolean };
+function historyText(e: HistoryEntry, tz: string) {
+  if (e.type === "decided") return `Marked ${e.decision ? DECISION_LABEL[e.decision] : ""}`;
+  if (e.type === "decision_cleared") return `Decision reopened${e.decision ? ` (was ${DECISION_LABEL[e.decision]})` : ""}`;
+  if (e.type === "scorecard_edited") return `Scorecard edited${e.afterDecision ? " after the decision was reopened" : ""}${e.detail ? `: ${e.detail}` : ""}`;
+  return `${HISTORY_LABEL[e.type] ?? e.type}${e.to && e.type !== "cancelled" ? `: ${formatInZone(e.to, tz)}` : ""}`;
+}
 
 export default async function HumanInterviewPage(props: PageProps<"/interviews/human/[id]">) {
   const auth = await requireAuth("interview:view");
@@ -64,30 +111,21 @@ export default async function HumanInterviewPage(props: PageProps<"/interviews/h
               schedule={{ scheduledAt: h.scheduled_at.toISOString(), durationMinutes: h.duration_minutes, timezone: h.timezone, locationType: h.location_type, location: h.location, message: h.message, interviewerIds: h.panel.map((p) => p.user_id) }} />
           </FormCard>
 
-          {onPanel && can(auth.role, "scorecard:write") && h.status !== "cancelled" && (
-            <FormCard title="Your scorecard" description={mine?.submitted_at ? "Submitted. You can still update it." : "Rate each skill from 1 to 5. Your team sees it once you submit."}>
+          {onPanel && can(auth.role, "scorecard:write") && h.status !== "cancelled" && (h.decision ? (
+            <FormCard title="Your scorecard" description={`Locked: the round decision was made${h.decided_at ? ` on ${formatDate(h.decided_at)}` : ""}. Ask a recruiter to clear the decision if you need to change it.`}>
+              {mine?.submitted_at ? <ScorecardView s={mine} showName={false} /> : <p className="text-sm text-muted-foreground">You didn&apos;t submit a scorecard before the decision was made.</p>}
+            </FormCard>
+          ) : (
+            <FormCard title="Your scorecard" description={mine?.submitted_at ? "Submitted. You can update it until the round decision is made." : "Rate each skill from 1 to 5. Your team sees it once you submit."}>
               <ScorecardForm id={h.id} criteria={h.criteria} submitted={!!mine?.submitted_at}
                 initial={mine ? { ratings: mine.ratings, notes: mine.notes, recommendation: mine.recommendation } : null} />
             </FormCard>
-          )}
+          ))}
 
           {others.length > 0 && (
             <FormCard title="Scorecards from the panel">
               <ul className="space-y-5">
-                {others.map((s) => (
-                  <li key={s.user_id} className="space-y-2 rounded-lg border p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium">{s.name}</p>{s.recommendation && <DecisionBadge decision={s.recommendation} />}</div>
-                    <ul className="space-y-1.5">
-                      {s.ratings.map((r) => (
-                        <li key={r.criterion} className="text-sm">
-                          <div className="flex flex-wrap items-center justify-between gap-2"><span>{r.criterion}</span><Stars value={r.rating} label={`${s.name}'s rating for ${r.criterion}`} /></div>
-                          {r.comment && <p className="text-xs text-muted-foreground">{r.comment}</p>}
-                        </li>
-                      ))}
-                    </ul>
-                    {s.notes && <p className="whitespace-pre-wrap rounded-md bg-muted/50 px-3 py-2 text-sm">{s.notes}</p>}
-                  </li>
-                ))}
+                {others.map((s) => <li key={s.user_id}><ScorecardView s={s} /></li>)}
               </ul>
             </FormCard>
           )}
@@ -97,7 +135,7 @@ export default async function HumanInterviewPage(props: PageProps<"/interviews/h
         </div>
 
         <div className="min-w-0 space-y-6">
-          <FormCard title="Decision" description="Your team's call for this round. Scorecards are recommendations.">
+          <FormCard title="Decision" description="Your team's call for this round. Scorecards are recommendations, and they lock once you decide (clear the decision to unlock them).">
             <DecisionControl endpoint={`/api/human-interviews/${h.id}/decision`} decision={h.decision} note={h.decision_note} decidedBy={h.decided_by_name}
               decidedOn={h.decided_at ? formatDate(h.decided_at) : null} canEdit={canDecide && h.status !== "cancelled"} hint={hint} />
           </FormCard>
@@ -114,7 +152,7 @@ export default async function HumanInterviewPage(props: PageProps<"/interviews/h
             <ol className="space-y-2 text-sm">
               {[...h.history].reverse().map((e, i) => (
                 <li key={i}>
-                  <p>{HISTORY_LABEL[e.type] ?? e.type}{e.to && e.type !== "cancelled" ? `: ${formatInZone(e.to, h.timezone)}` : ""}</p>
+                  <p className={e.type === "decision_cleared" || (e.type === "scorecard_edited" && e.afterDecision) ? "font-medium text-amber-800 dark:text-amber-300" : undefined}>{historyText(e, h.timezone)}</p>
                   <p className="text-xs text-muted-foreground">{names.get(e.by) ?? "Someone"} · {new Date(e.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}{e.reason ? ` · ${e.reason}` : ""}</p>
                 </li>
               ))}

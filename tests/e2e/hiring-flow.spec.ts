@@ -89,6 +89,27 @@ test("round decisions, human interview and shortlist", async ({ page }) => {
   await decision.getByRole("button", { name: "Qualified", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Save decision" }).click();
   await expect(page.getByText("Marked Qualified")).toBeVisible();
+  // Deciding locks the scorecard.
+  await expect(page.getByText(/Locked: the round decision was made/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Update scorecard" })).toHaveCount(0);
+
+  // The recruiter is also the interviewer: reopening and editing is allowed, but never hidden.
+  await decision.getByRole("button", { name: "Clear" }).click();
+  const reopen = page.getByRole("dialog");
+  await expect(reopen.getByRole("button", { name: "Reopen round" })).toBeDisabled();
+  await reopen.getByLabel("Reason").fill("Second opinion from the hiring manager");
+  await reopen.getByRole("button", { name: "Reopen round" }).click();
+  await expect(page.getByText("Round reopened")).toBeVisible();
+  await page.getByRole("radiogroup", { name: "Rating for Communication" }).getByRole("radio", { name: /^5:/ }).click();
+  await page.getByRole("button", { name: "Update scorecard" }).click();
+  await expect(page.getByText("Scorecard submitted")).toBeVisible();
+  await decision.getByRole("button", { name: "Qualified", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Save decision" }).click();
+  await expect(page.getByText("Edited after decision")).toBeVisible();
+  await expect(page.getByText("Earlier version")).toBeVisible();
+  await expect(page.getByText(/Decision reopened \(was Qualified\)/)).toBeVisible();
+  await expect(page.getByText(/Scorecard edited after the decision was reopened: ratings or notes changed/)).toBeVisible();
+  if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: "test-results/hiring-8-edited-after-decision.png", fullPage: true });
   if (process.env.E2E_SCREENSHOTS) await page.screenshot({ path: "test-results/hiring-4-human-interview.png", fullPage: true });
 
 

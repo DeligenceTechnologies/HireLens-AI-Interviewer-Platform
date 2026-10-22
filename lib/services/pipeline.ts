@@ -1,7 +1,7 @@
 import "server-only";
 import { ApiError } from "@/lib/api";
 import { audit } from "@/lib/audit";
-import { withOrg, type Tx } from "@/lib/database/db";
+import { json, withOrg, type Tx } from "@/lib/database/db";
 import type { Decision, Stage } from "@/lib/hiring";
 
 // A candidate's progress in a job: each round (AI or human interview) is
@@ -104,9 +104,20 @@ export async function getJobPipeline(orgId: string, jobId: string) {
 }
 
 /** Mark one interview (AI or human) Qualified / Not qualified / On hold, or clear it. */
+/**
+ * Mark one interview (AI or human) Qualified / Not qualified / On hold, or clear
+ * it. Clearing a decision reopens the round (and unlocks human scorecards), so
+ * it needs a reason, recorded in the history and audit log.
+ */
 export async function setRoundDecision(orgId: string, userId: string, input: { kind: "ai" | "human"; id: string; decision: Decision | null; note?: string | null }) {
   const note = input.decision ? input.note?.trim() || null : null;
+  const reason = input.decision ? null : input.note?.trim() || null;
   await withOrg(orgId, async (tx) => {
+    const [before] = input.kind === "ai"
+      ? await tx<{ decision: Decision | null }[]>`select decision from interviews where id = ${input.id} and organization_id = ${orgId} for update`
+      : await tx<{ decision: Decision | null }[]>`select decision from human_interviews where id = ${input.id} and organization_id = ${orgId} for update`;
+    if (!before) throw new ApiError(404, "Interview not found");
+    if (!input.decision && before.decision && !reason) throw new ApiError(400, "Add a reason for reopening this round.", "needs_reason");
     const [row] = input.kind === "ai"
       ? await tx<{ id: string; job_id: string; candidate_id: string }[]>`
           update interviews set decision = ${input.decision}, decision_note = ${note}, decided_by = ${input.decision ? userId : null}, decided_at = ${input.decision ? new Date() : null}
@@ -116,9 +127,15 @@ export async function setRoundDecision(orgId: string, userId: string, input: { k
           where id = ${input.id} and organization_id = ${orgId} returning id, job_id, candidate_id`;
     if (!row) throw new ApiError(404, "Interview not found");
     await ensurePipeline(tx, orgId, row.job_id, row.candidate_id);
+    if (input.kind === "human" && before.decision !== input.decision) {
+      const item = input.decision
+        ? { type: "decided", at: new Date().toISOString(), by: userId, decision: input.decision }
+        : { type: "decision_cleared", at: new Date().toISOString(), by: userId, decision: before.decision, reason: reason!.slice(0, 300) };
+      await tx`update human_interviews set history = history || ${json([item])} where id = ${input.id}`;
+    }
     await audit(tx, {
       orgId, userId, action: "interview.decision", entityType: input.kind === "ai" ? "interview" : "human_interview", entityId: input.id,
-      metadata: { decision: input.decision, ...(note ? { note: note.slice(0, 300) } : {}) },
+      metadata: { decision: input.decision, previous: before.decision, ...(note ? { note: note.slice(0, 300) } : {}), ...(reason ? { reason: reason.slice(0, 300) } : {}) },
     });
   });
 }

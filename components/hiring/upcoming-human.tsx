@@ -11,7 +11,7 @@ export function UpcomingHumanInterviews({ rows }: { rows: HumanListRow[] }) {
       <h2 className="flex items-center gap-2 border-b px-5 py-4 font-semibold"><UserRound className="size-4 text-primary" /> Human interviews</h2>
       <ul className="divide-y">
         {rows.map((r) => {
-          const needsScorecard = r.on_panel && !r.my_scorecard_submitted && (r.status === "completed" || r.is_past);
+          const needsScorecard = r.on_panel && !r.my_scorecard_submitted && !r.decided && (r.status === "completed" || r.is_past);
           return (
             <li key={r.id}>
               <Link href={`/interviews/human/${r.id}`} className="flex flex-wrap items-center gap-3 px-5 py-3 hover:bg-muted/40">

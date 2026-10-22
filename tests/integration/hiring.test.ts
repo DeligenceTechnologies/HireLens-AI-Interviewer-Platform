@@ -106,6 +106,22 @@ describe("hiring decisions and human interviews", () => {
   it("asks for a reason to shortlist early, then shortlists once every round is qualified", async () => {
     await expect(setStage(orgId, owner, { jobId, candidateId, stage: "shortlisted" })).rejects.toMatchObject({ status: 400, code: "needs_reason" });
     await setRoundDecision(orgId, owner, { kind: "human", id: humanId, decision: "qualified" });
+    // Deciding locks scorecards; clearing the decision unlocks them.
+    const ratings = [{ criterion: "System design", rating: 3 }, { criterion: "Communication", rating: 3 }];
+    await expect(saveScorecard(orgId, interviewer, humanId, { ratings, notes: null, recommendation: "on_hold", submit: true })).rejects.toMatchObject({ status: 409, code: "scorecard_locked" });
+    // Reopening needs a reason; an edit afterwards keeps the earlier version and is flagged for the team.
+    await expect(setRoundDecision(orgId, owner, { kind: "human", id: humanId, decision: null })).rejects.toMatchObject({ status: 400, code: "needs_reason" });
+    await setRoundDecision(orgId, owner, { kind: "human", id: humanId, decision: null, note: "Reference check raised a question" });
+    await saveScorecard(orgId, interviewer, humanId, { ratings, notes: "Changed my mind", recommendation: "on_hold", submit: true });
+    const edited = (await getHumanInterview(orgId, humanId, { userId: owner, role: "owner" }))!;
+    expect(edited.scorecards[0]).toMatchObject({ recommendation: "on_hold", edited_after_decision: true });
+    expect(edited.scorecards[0].versions).toEqual([expect.objectContaining({ recommendation: "qualified", notes: "Hire" })]);
+    expect(edited.history.map((e) => e.type)).toEqual(expect.arrayContaining(["decided", "decision_cleared", "scorecard_edited"]));
+    expect(edited.history.find((e) => e.type === "decision_cleared")).toMatchObject({ reason: "Reference check raised a question", decision: "qualified" });
+    expect(edited.history.find((e) => e.type === "scorecard_edited")).toMatchObject({ afterDecision: true, detail: "recommendation Qualified → On hold" });
+    const [{ n }] = await withSystem((tx) => tx<{ n: number }[]>`select count(*)::int as n from audit_logs where entity_id = ${humanId} and action = 'human_interview.scorecard_updated'`);
+    expect(n).toBe(1);
+    await setRoundDecision(orgId, owner, { kind: "human", id: humanId, decision: "qualified" });
     await setStage(orgId, owner, { jobId, candidateId, stage: "shortlisted" });
     const { rows } = await getJobPipeline(orgId, jobId);
     expect(rows).toEqual([expect.objectContaining({ candidate_id: candidateId, stage: "shortlisted", allQualified: true })]);

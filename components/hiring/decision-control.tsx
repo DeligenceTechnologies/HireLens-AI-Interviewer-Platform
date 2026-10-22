@@ -28,9 +28,11 @@ export function DecisionControl({ endpoint, decision, note, decidedBy, decidedOn
   const { run, pending } = useAction();
   const [choice, setChoice] = useState<Decision | null>(null);
   const [text, setText] = useState("");
+  const [clearing, setClearing] = useState(false);
+  const [reason, setReason] = useState("");
   const save = async (d: Decision | null, n: string | null) => {
-    const ok = await run("decide", endpoint, { body: { decision: d, note: n }, success: d ? `Marked ${DECISION_LABEL[d]}` : "Decision cleared" });
-    if (ok) setChoice(null);
+    const ok = await run("decide", endpoint, { body: { decision: d, note: n }, success: d ? `Marked ${DECISION_LABEL[d]}` : "Round reopened" });
+    if (ok) { setChoice(null); setClearing(false); }
   };
   return (
     <div className="space-y-3">
@@ -53,9 +55,25 @@ export function DecisionControl({ endpoint, decision, note, decidedBy, decidedOn
               </Button>
             );
           })}
-          {decision && <Button size="sm" variant="ghost" disabled={!!pending} onClick={() => save(null, null)}>Clear</Button>}
+          {decision && <Button size="sm" variant="ghost" disabled={!!pending} onClick={() => { setReason(""); setClearing(true); }}>Clear</Button>}
         </div>
       )}
+      <Dialog open={clearing} onOpenChange={setClearing}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reopen this round?</DialogTitle>
+            <DialogDescription>The decision is removed and interviewers can edit their scorecards again. The reason and any scorecard changes are shown to your team in the history.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="clear-reason" required>Reason</Label>
+            <Textarea id="clear-reason" rows={2} maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. New information from the reference check" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearing(false)}>Keep decision</Button>
+            <Button disabled={!!pending || !reason.trim()} onClick={() => save(null, reason.trim())}>{pending && <Loader2 className="animate-spin" />} Reopen round</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={!!choice} onOpenChange={(o) => !o && setChoice(null)}>
         <DialogContent>
           <DialogHeader>

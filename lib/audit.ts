@@ -8,7 +8,7 @@ export type AuditAction =
   | "candidate.created" | "candidate.updated" | "candidate.resume_uploaded" | "candidate.deleted" | "candidate.stage_changed"
   | "interview.decision"
   | "human_interview.scheduled" | "human_interview.rescheduled" | "human_interview.cancelled" | "human_interview.completed"
-  | "human_interview.no_show" | "human_interview.reopened" | "human_interview.scorecard_submitted"
+  | "human_interview.no_show" | "human_interview.reopened" | "human_interview.scorecard_submitted" | "human_interview.scorecard_updated"
   | "job.apply_link_changed" | "application.received" | "application.screened" | "application.status_changed" | "application.interview_invited"
   | "template.created" | "template.updated" | "template.deleted"
   | "interview.created" | "interview.invited" | "interview.reminded" | "interview.cancelled" | "interview.plan_generated"

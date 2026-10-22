@@ -6,7 +6,7 @@ import type { Role } from "@/lib/auth/permissions";
 import { json, withOrg, type Tx } from "@/lib/database/db";
 import { emailTemplates, sendEmail } from "@/lib/email";
 import { env } from "@/lib/env";
-import { DECISIONS, formatInZone, LOCATION_LABEL, LOCATION_TYPES, MAX_CRITERIA, type Decision, type HumanStatus, type LocationType } from "@/lib/hiring";
+import { DECISION_LABEL, DECISIONS, formatInZone, LOCATION_LABEL, LOCATION_TYPES, MAX_CRITERIA, type Decision, type HumanStatus, type LocationType } from "@/lib/hiring";
 import { buildIcs } from "@/lib/ics";
 import { ensurePipeline } from "./pipeline";
 
@@ -48,7 +48,12 @@ export const ScorecardSchema = z.object({
   submit: z.boolean().default(false),
 });
 
-type HistoryItem = { type: "scheduled" | "rescheduled" | "cancelled" | "completed" | "no_show" | "reopened"; at: string; by: string; from?: string; to?: string; reason?: string };
+type HistoryItem = {
+  type: "scheduled" | "rescheduled" | "cancelled" | "completed" | "no_show" | "reopened" | "decided" | "decision_cleared" | "scorecard_edited";
+  at: string; by: string; from?: string; to?: string; reason?: string;
+  decision?: Decision | null; detail?: string; afterDecision?: boolean;
+};
+export type ScorecardVersion = { ratings: { criterion: string; rating: number | null; comment?: string | null }[]; notes: string | null; recommendation: Decision | null; submitted_at: string | null; replaced_at: string };
 
 export type HumanInterview = {
   id: string; job_id: string; job_title: string; candidate_id: string; candidate_name: string; candidate_email: string; company_name: string;
@@ -58,7 +63,10 @@ export type HumanInterview = {
   decision: Decision | null; decision_note: string | null; decided_at: Date | null; decided_by_name: string | null;
   created_at: Date; created_by_name: string | null;
   panel: { user_id: string; name: string; email: string }[];
-  scorecards: { user_id: string; name: string; ratings: { criterion: string; rating: number | null; comment?: string | null }[]; notes: string | null; recommendation: Decision | null; submitted_at: Date | null; updated_at: Date }[];
+  scorecards: {
+    user_id: string; name: string; ratings: { criterion: string; rating: number | null; comment?: string | null }[]; notes: string | null; recommendation: Decision | null;
+    submitted_at: Date | null; updated_at: Date; versions: ScorecardVersion[]; edited_after_decision: boolean;
+  }[];
 };
 
 async function loadPanel(tx: Tx, orgId: string, ids: string[]) {
@@ -85,7 +93,7 @@ async function load(tx: Tx, orgId: string, id: string): Promise<HumanInterview |
   const panel = await tx<HumanInterview["panel"]>`
     select p.user_id, u.name, u.email from human_interview_panel p join users u on u.id = p.user_id where p.human_interview_id = ${id} order by u.name`;
   const scorecards = await tx<HumanInterview["scorecards"]>`
-    select s.user_id, u.name, s.ratings, s.notes, s.recommendation, s.submitted_at, s.updated_at
+    select s.user_id, u.name, s.ratings, s.notes, s.recommendation, s.submitted_at, s.updated_at, s.versions, s.edited_after_decision
     from human_interview_scorecards s join users u on u.id = s.user_id where s.human_interview_id = ${id} order by s.submitted_at nulls last, u.name`;
   return { ...h, panel, scorecards };
 }
@@ -246,6 +254,8 @@ export async function saveScorecard(orgId: string, userId: string, id: string, i
   await change(orgId, userId, id, async (tx, h) => {
     if (!h.panel.some((p) => p.user_id === userId)) throw new ApiError(403, "Only interviewers on this interview's panel can fill in a scorecard.");
     if (h.status === "cancelled") throw new ApiError(409, "This interview was cancelled.");
+    // Once the team has decided the round, scorecards are locked so they always match the decision.
+    if (h.decision) throw new ApiError(409, "Scorecards are locked because the round decision has been made. Ask a recruiter to clear the decision if you need to change yours.", "scorecard_locked");
     const ratings = h.criteria.map((criterion) => {
       const r = input.ratings.find((x) => x.criterion === criterion);
       return { criterion, rating: r?.rating ?? null, comment: r?.comment || null };
@@ -254,12 +264,27 @@ export async function saveScorecard(orgId: string, userId: string, id: string, i
       if (ratings.some((r) => r.rating === null)) throw new ApiError(400, "Rate every skill before submitting.");
       if (!input.recommendation) throw new ApiError(400, "Choose your recommendation before submitting.");
     }
-    const [prev] = await tx<{ submitted_at: Date | null }[]>`select submitted_at from human_interview_scorecards where human_interview_id = ${id} and user_id = ${userId}`;
+    const [prev] = await tx<{ ratings: ScorecardVersion["ratings"]; notes: string | null; recommendation: Decision | null; submitted_at: Date | null }[]>`
+      select ratings, notes, recommendation, submitted_at from human_interview_scorecards where human_interview_id = ${id} and user_id = ${userId}`;
+    const notes = input.notes || null;
+    const recommendation = input.recommendation ?? null;
+    const changed = !!prev?.submitted_at && (JSON.stringify(prev.ratings) !== JSON.stringify(ratings) || prev.notes !== notes || prev.recommendation !== recommendation);
+    // An edit to a submitted scorecard keeps the earlier version; editing after a decision was reopened is flagged for the team.
+    const reopened = changed && h.history.some((e) => e.type === "decision_cleared" && new Date(e.at) > prev!.submitted_at!);
+    const version: ScorecardVersion | null = changed ? { ratings: prev!.ratings, notes: prev!.notes, recommendation: prev!.recommendation, submitted_at: prev!.submitted_at!.toISOString(), replaced_at: new Date().toISOString() } : null;
     await tx`
       insert into human_interview_scorecards (organization_id, human_interview_id, user_id, ratings, notes, recommendation, submitted_at, updated_at)
-      values (${orgId}, ${id}, ${userId}, ${json(ratings)}, ${input.notes || null}, ${input.recommendation ?? null}, ${input.submit ? new Date() : null}, now())
+      values (${orgId}, ${id}, ${userId}, ${json(ratings)}, ${notes}, ${recommendation}, ${input.submit ? new Date() : null}, now())
       on conflict (human_interview_id, user_id) do update set ratings = excluded.ratings, notes = excluded.notes, recommendation = excluded.recommendation,
-        submitted_at = coalesce(excluded.submitted_at, human_interview_scorecards.submitted_at), updated_at = now()`;
+        submitted_at = coalesce(excluded.submitted_at, human_interview_scorecards.submitted_at), updated_at = now(),
+        versions = human_interview_scorecards.versions || ${json(version ? [version] : [])},
+        edited_after_decision = human_interview_scorecards.edited_after_decision or ${reopened}`;
+    if (version) {
+      const label = (d: Decision | null) => (d ? DECISION_LABEL[d] : "none");
+      const detail = prev!.recommendation !== recommendation ? `recommendation ${label(prev!.recommendation)} → ${label(recommendation)}` : "ratings or notes changed";
+      await push(tx, id, { type: "scorecard_edited", at: new Date().toISOString(), by: userId, detail, afterDecision: reopened });
+      await audit(tx, { orgId, userId, action: "human_interview.scorecard_updated", entityType: "human_interview", entityId: id, metadata: { from: prev!.recommendation, to: recommendation, after_decision_reopened: reopened } });
+    }
     if (input.submit && !prev?.submitted_at) {
       // Submitting a scorecard means the interview took place.
       if (h.status === "scheduled") {
@@ -278,6 +303,8 @@ export type HumanListRow = {
   scheduled_at: Date; duration_minutes: number; timezone: string; location_type: LocationType; location: string | null; on_panel: boolean; my_scorecard_submitted: boolean;
   /** The interview's end time has passed. */
   is_past: boolean;
+  /** The round decision is made (scorecards are locked). */
+  decided: boolean;
 };
 
 /**
@@ -288,14 +315,14 @@ export async function listMyHumanInterviews(orgId: string, viewer: { userId: str
   const onlyMine = viewer.role === "interviewer";
   return withOrg(orgId, (tx) => tx<HumanListRow[]>`
     select h.id, h.job_id, j.title as job_title, h.candidate_id, c.name as candidate_name, h.round_name, h.status, h.scheduled_at, h.duration_minutes,
-      h.timezone, h.location_type, h.location, (h.scheduled_at + make_interval(mins => h.duration_minutes)) < now() as is_past,
+      h.timezone, h.location_type, h.location, (h.scheduled_at + make_interval(mins => h.duration_minutes)) < now() as is_past, h.decision is not null as decided,
       exists (select 1 from human_interview_panel p where p.human_interview_id = h.id and p.user_id = ${viewer.userId}) as on_panel,
       exists (select 1 from human_interview_scorecards s where s.human_interview_id = h.id and s.user_id = ${viewer.userId} and s.submitted_at is not null) as my_scorecard_submitted
     from human_interviews h join jobs j on j.id = h.job_id join candidates c on c.id = h.candidate_id
     where h.organization_id = ${orgId}
       and h.status in ('scheduled', 'completed')
       and (h.scheduled_at > now() - interval '12 hours'
-        or exists (select 1 from human_interview_panel p where p.human_interview_id = h.id and p.user_id = ${viewer.userId}
+        or exists (select 1 from human_interview_panel p where p.human_interview_id = h.id and p.user_id = ${viewer.userId} and h.decision is null
                    and not exists (select 1 from human_interview_scorecards s where s.human_interview_id = h.id and s.user_id = ${viewer.userId} and s.submitted_at is not null)))
       ${onlyMine ? tx`and exists (select 1 from human_interview_panel p where p.human_interview_id = h.id and p.user_id = ${viewer.userId})` : tx``}
     order by h.scheduled_at
