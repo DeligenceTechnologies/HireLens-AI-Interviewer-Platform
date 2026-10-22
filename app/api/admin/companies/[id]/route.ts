@@ -8,6 +8,8 @@ const Schema = z.object({
   quota: QuotaSchema.optional(),
   notes: z.string().trim().max(4000).nullable().optional(),
   status: z.enum(["active", "suspended"]).optional(),
+  extendTrialDays: z.number().int().min(1).max(90).optional(),
+  convertTrial: z.literal(true).optional(),
 });
 
 export const PATCH = route<{ id: string }>(async (req, { id }) => {

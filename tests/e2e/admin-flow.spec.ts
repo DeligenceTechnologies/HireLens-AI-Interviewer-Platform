@@ -35,7 +35,7 @@ test("platform admin manages access, quotas and accounts", async ({ page, browse
   const company = `Client Co ${id}`;
 
   // Admin account (signs up like anyone else, then is promoted from the command line).
-  await page.goto("/signup");
+  await page.goto("/signup?code=1");
   await page.getByLabel("Full name").fill("Avery Admin");
   await page.getByLabel("Work email").fill(adminEmail);
   await page.getByLabel("Company / workspace name").fill(`Admin Co ${id}`);

@@ -17,7 +17,7 @@ test("recruiter to candidate to report", async ({ page, browser }) => {
   const candidateEmail = `candidate-${id}@e2e.test`;
 
   // 1. Sign up
-  await page.goto("/signup");
+  await page.goto("/signup?code=1");
   await page.getByLabel("Full name").fill("Casey Recruiter");
   await page.getByLabel("Work email").fill(email);
   await page.getByLabel("Company / workspace name").fill(`E2E Co ${id}`);

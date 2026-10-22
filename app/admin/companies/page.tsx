@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { FilterTabs } from "@/components/admin/filter-tabs";
 import { NewCompanyButton, RevokeLinkButton } from "@/components/admin/new-company";
-import { CompanyStatusBadge, QuotaBadge } from "@/components/admin/quota-badge";
+import { CompanyStatusBadge, QuotaBadge, TrialBadge } from "@/components/admin/quota-badge";
 import { PageHeader } from "@/components/common/page-header";
 import { SearchBar } from "@/components/common/search-bar";
 import { EmptyState } from "@/components/common/states";
@@ -13,7 +13,7 @@ import { getDefaultQuota } from "@/lib/services/platform";
 export const metadata = { title: "Companies" };
 
 const TABS: { value: CompanyFilter; label: string }[] = [
-  { value: "all", label: "All" }, { value: "active", label: "Active" }, { value: "suspended", label: "Suspended" }, { value: "out_of_quota", label: "Out of interviews" },
+  { value: "all", label: "All" }, { value: "active", label: "Active" }, { value: "trial", label: "Free trials" }, { value: "suspended", label: "Suspended" }, { value: "out_of_quota", label: "Out of interviews" },
 ];
 
 export default async function CompaniesPage(props: PageProps<"/admin/companies">) {
@@ -56,8 +56,9 @@ export default async function CompaniesPage(props: PageProps<"/admin/companies">
                   <td className="px-4 py-3">
                     <Link href={`/admin/companies/${c.id}`} className="font-medium after:absolute after:inset-0 group-hover:text-primary">{c.name}</Link>
                     <p className="text-xs text-muted-foreground">{c.owner_email ?? "No owner"}</p>
+                    {c.same_domain > 0 && <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Same email domain as {c.same_domain} other trial{c.same_domain === 1 ? "" : "s"}</p>}
                   </td>
-                  <td className="px-4 py-3"><CompanyStatusBadge status={c.status} /></td>
+                  <td className="px-4 py-3"><span className="flex flex-wrap gap-1"><CompanyStatusBadge status={c.status} />{c.plan === "trial" && <TrialBadge daysLeft={c.trial_days_left} />}</span></td>
                   <td className="px-4 py-3"><QuotaBadge quota={c.interview_quota} used={c.used} inProgress={c.in_progress} /></td>
                   <td className="px-4 py-3 tabular">{c.members}</td>
                   <td className="px-4 py-3 text-muted-foreground">{c.last_interview_at ? timeAgo(c.last_interview_at) : "—"}</td>

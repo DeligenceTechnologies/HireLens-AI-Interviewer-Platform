@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { MembersCard, NotesCard, QuotaCard, SuspendButton, type CompanyData } from "@/components/admin/company-manager";
-import { CompanyStatusBadge } from "@/components/admin/quota-badge";
+import { MembersCard, NotesCard, QuotaCard, SuspendButton, TrialCard, type CompanyData } from "@/components/admin/company-manager";
+import { CompanyStatusBadge, TrialBadge } from "@/components/admin/quota-badge";
 import { PageHeader } from "@/components/common/page-header";
 import { FormCard } from "@/components/settings/form-card";
 import { formatDate } from "@/lib/format";
@@ -29,7 +29,7 @@ export default async function CompanyPage(props: PageProps<"/admin/companies/[id
     <>
       <PageHeader
         back={{ href: "/admin/companies", label: "Companies" }}
-        title={<span className="flex flex-wrap items-center gap-3">{company.org.name} <CompanyStatusBadge status={company.org.status} /></span>}
+        title={<span className="flex flex-wrap items-center gap-3">{company.org.name} <CompanyStatusBadge status={company.org.status} />{company.org.plan === "trial" && <TrialBadge daysLeft={company.org.trial_days_left} />}</span>}
         meta={<>
           <span>Created {formatDate(company.org.created_at)}</span>
           {company.org.suspended_at && <span>Suspended {formatDate(company.org.suspended_at, true)}</span>}
@@ -50,6 +50,7 @@ export default async function CompanyPage(props: PageProps<"/admin/companies/[id
           </FormCard>
         </div>
         <div className="min-w-0 space-y-6">
+          {company.org.plan === "trial" && <TrialCard id={id} endsAt={data.org.trial_ends_at} daysLeft={company.org.trial_days_left} domain={company.org.signup_domain} />}
           <QuotaCard id={id} quota={data.quota} />
           <NotesCard id={id} notes={company.org.admin_notes} />
         </div>

@@ -16,6 +16,17 @@ export function QuotaBadge({ quota, used, inProgress }: { quota: number | null; 
   );
 }
 
+/** "Trial · 9 days left" / "Trial ended". */
+export function TrialBadge({ daysLeft: days }: { daysLeft: number | null }) {
+  const ended = days !== null && days <= 0;
+  return (
+    <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+      ended ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300" : "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300")}>
+      {ended ? "Trial ended" : days === null ? "Trial" : `Trial · ${days} day${days === 1 ? "" : "s"} left`}
+    </span>
+  );
+}
+
 export function CompanyStatusBadge({ status }: { status: "active" | "suspended" }) {
   return status === "active"
     ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">Active</span>

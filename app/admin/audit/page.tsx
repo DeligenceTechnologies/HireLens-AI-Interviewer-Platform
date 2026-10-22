@@ -14,6 +14,9 @@ const LABEL: Record<string, string> = {
   "company_invite.revoked": "Revoked company sign-up link",
   "company.updated": "Updated company",
   "company.suspended": "Suspended company",
+  "company.trial_started": "Free trial started",
+  "company.trial_extended": "Extended free trial",
+  "company.trial_converted": "Converted trial to full account",
   "company.reactivated": "Reactivated company",
   "company.member_added": "Added member",
   "company.member_invited": "Invited member",
@@ -52,7 +55,7 @@ export default async function AdminAuditPage(props: PageProps<"/admin/audit">) {
               {rows.map((r) => (
                 <tr key={r.id} className="align-top">
                   <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{formatDate(r.created_at, true)}</td>
-                  <td className="px-4 py-3">{r.admin_name ?? "—"}<p className="text-xs text-muted-foreground">{r.admin_email}</p></td>
+                  <td className="px-4 py-3">{r.admin_name ?? (r.action === "company.trial_started" ? "Self sign-up" : "—")}<p className="text-xs text-muted-foreground">{r.admin_email ?? (r.action === "company.trial_started" ? String(r.details.email ?? "") : "")}</p></td>
                   <td className="px-4 py-3">
                     {r.target_type === "organization" && r.target_id ? <Link href={`/admin/companies/${r.target_id}`} className="hover:text-primary">{LABEL[r.action] ?? r.action}</Link> : (LABEL[r.action] ?? r.action)}
                   </td>

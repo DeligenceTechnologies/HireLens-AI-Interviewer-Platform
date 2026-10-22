@@ -107,6 +107,12 @@ ${input.companyName} hiring team`,
       text: `${input.inviter} invited you to join ${input.orgName} as ${input.role}.\n\nAccept the invitation: ${input.link}\n\nThis link expires in 7 days.`,
     };
   },
+  verifyEmail(input: { name: string; link: string }) {
+    return {
+      subject: "Confirm your email to start your PickMyHire.ai trial",
+      text: `Hi ${input.name},\n\nConfirm your email to start inviting candidates to AI interviews (link valid for 3 days):\n${input.link}\n\nIf you didn't sign up for PickMyHire.ai, you can ignore this email.`,
+    };
+  },
   passwordReset(input: { link: string }) {
     return {
       subject: "Reset your password",

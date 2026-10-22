@@ -5,7 +5,7 @@ import path from "node:path";
 // AI screening tags the application → recruiter invites the applicant to an interview.
 test("public application with AI screening", async ({ page, browser }) => {
   const id = Date.now().toString(36);
-  await page.goto("/signup");
+  await page.goto("/signup?code=1");
   await page.getByLabel("Full name").fill("Pat Recruiter");
   await page.getByLabel("Work email").fill(`apply-${id}@e2e.test`);
   await page.getByLabel("Company / workspace name").fill(`Apply Co ${id}`);
@@ -67,15 +67,15 @@ test("public application with AI screening", async ({ page, browser }) => {
   await expect(page.getByRole("link", { name: "View interview" })).toBeVisible();
 });
 
-test("sign-up is closed without an access code", async ({ page }) => {
-  await page.goto("/signup");
+test("a wrong access code is turned away", async ({ page }) => {
+  await page.goto("/signup?code=1");
   await page.getByLabel("Full name").fill("No Code");
   await page.getByLabel("Work email").fill(`nocode-${Date.now()}@e2e.test`);
   await page.getByLabel("Company / workspace name").fill("No Code Co");
   await page.getByLabel("Access code").fill("not-the-code");
   await page.getByLabel("Password").fill("long-enough-password");
   await page.getByRole("button", { name: "Create workspace" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: /available by approval/ })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: /access code isn.t valid/ })).toBeVisible();
 });
 
 test("home page access request form", async ({ page }) => {

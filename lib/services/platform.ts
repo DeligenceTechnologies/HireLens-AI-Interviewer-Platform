@@ -23,6 +23,20 @@ export async function getSignupCode(): Promise<SignupCodeSetting> {
   return { enabled: !!code, code };
 }
 
+export type TrialSettings = {
+  /** Anyone with a work email can start a trial without an access code. */
+  enabled: boolean;
+  interviews: number;
+  days: number;
+  /** Trial accounts must confirm their email before inviting candidates (needs email sending set up). */
+  requireVerification: boolean;
+};
+export const DEFAULT_TRIAL: TrialSettings = { enabled: true, interviews: 3, days: 14, requireVerification: false };
+
+export async function getTrialSettings(): Promise<TrialSettings> {
+  return { ...DEFAULT_TRIAL, ...((await readSetting<Partial<TrialSettings>>("free_trial")) ?? {}) };
+}
+
 /** Quota for newly created companies; null = unlimited. */
 export async function getDefaultQuota(): Promise<number | null> {
   const saved = await readSetting<{ value: number | null }>("default_quota");
@@ -36,7 +50,7 @@ export async function writeSetting(tx: Tx, key: string, value: unknown, adminId:
 }
 
 /** Record a platform admin action. Never throws (same contract as the tenant audit log). */
-export async function platformAudit(tx: Tx, entry: { adminId: string; action: string; targetType: string; targetId?: string | null; details?: Record<string, unknown> }) {
+export async function platformAudit(tx: Tx, entry: { adminId: string | null; action: string; targetType: string; targetId?: string | null; details?: Record<string, unknown> }) {
   try {
     await tx`savepoint paudit_sp`;
     await tx`

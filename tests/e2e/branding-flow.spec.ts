@@ -20,7 +20,7 @@ const LOGO = path.join(__dirname, "fixtures/company-logo.png");
 test("company logo and colour replace platform branding on candidate pages", async ({ page, browser }) => {
   const id = Date.now().toString(36);
   const company = `Brand Test ${id}`;
-  await page.goto("/signup");
+  await page.goto("/signup?code=1");
   await page.getByLabel("Full name").fill("Robin Owner");
   await page.getByLabel("Work email").fill(`brand-${id}@e2e.test`);
   await page.getByLabel("Company / workspace name").fill(company);
@@ -94,7 +94,7 @@ test("company logo and colour replace platform branding on candidate pages", asy
   const adminEmail = `brand-admin-${id}@e2e.test`;
   const admin = await browser.newContext();
   const ap = await admin.newPage();
-  await ap.goto("/signup");
+  await ap.goto("/signup?code=1");
   await ap.getByLabel("Full name").fill("Ada Admin");
   await ap.getByLabel("Work email").fill(adminEmail);
   await ap.getByLabel("Company / workspace name").fill(`Admin ${id}`);

@@ -13,7 +13,7 @@ export function AuthForm({ fields, submitLabel, endpoint, extra, onSuccess }: {
   fields: Field[];
   submitLabel: string;
   endpoint: string;
-  extra?: Record<string, string | undefined>;
+  extra?: Record<string, string | boolean | undefined>;
   onSuccess: (res: Record<string, unknown>) => void;
 }) {
   const [busy, setBusy] = useState(false);

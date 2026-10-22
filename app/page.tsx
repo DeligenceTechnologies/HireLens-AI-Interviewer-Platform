@@ -12,6 +12,7 @@ import { DemoVideo } from "@/components/marketing/demo-video";
 import { AccessRequestForm } from "@/components/marketing/access-request-form";
 import Image from "next/image";
 import { DEMO_URL } from "@/lib/marketing";
+import { getTrialSettings } from "@/lib/services/platform";
 
 export const metadata: Metadata = {
   title: { absolute: "PickMyHire.ai · AI video interviews with evidence you can verify" },
@@ -132,13 +133,16 @@ const FAQ = [
   ["How long is an interview?", "You decide in the template. Typical setups range from a 15-minute screen to a 45-minute structured technical interview."],
   ["What happens if a candidate's connection drops?", "Progress is saved continuously. The candidate reopens their link and continues where they left off, and the recording is kept in parts."],
   ["Where is our data stored, and who can see it?", "Data is stored privately, isolated per company, and access is controlled by roles. For example, interviewers and viewers can't see candidate contact details or resumes. Retention settings let you remove old recordings automatically."],
-  ["How much does it cost?", "Pricing depends on your hiring volume. Book a demo or contact us and we'll put together a plan for your team."],
 ];
+const PRICING_FAQ = "Pricing depends on your hiring volume. Book a demo or contact us and we'll put together a plan for your team.";
 
-export default function Home() {
+export default async function Home() {
+  const trial = await getTrialSettings();
+  const trialLine = `${trial.interviews} AI interviews free for ${trial.days} days`;
+  const faqs = [...FAQ, ["How much does it cost?", trial.enabled ? `You can start with a free trial: ${trialLine}, no credit card needed. After that, ${PRICING_FAQ.charAt(0).toLowerCase()}${PRICING_FAQ.slice(1)}` : PRICING_FAQ]];
   return (
     <div className="min-h-screen bg-[#F8FAFD] text-[#0F1F3A]">
-      <SiteHeader />
+      <SiteHeader trial={trial.enabled} />
 
       {/* Hero */}
       <section className="relative overflow-hidden">
@@ -155,9 +159,19 @@ export default function Home() {
               PickMyHire.ai runs personalized AI video interviews for every candidate and gives your team reports where every assessment links to the exact moment in the transcript and recording.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className={BLUE_BTN}>Book a demo <ArrowRight className="size-4" /></a>
-              <a href="#contact" className={GHOST_BTN}>Contact us</a>
+              {trial.enabled ? (
+                <>
+                  <Link href="/signup" className={BLUE_BTN}>Start free trial <ArrowRight className="size-4" /></Link>
+                  <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className={GHOST_BTN}>Book a demo</a>
+                </>
+              ) : (
+                <>
+                  <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className={BLUE_BTN}>Book a demo <ArrowRight className="size-4" /></a>
+                  <a href="#contact" className={GHOST_BTN}>Contact us</a>
+                </>
+              )}
             </div>
+            {trial.enabled && <p className="mt-3 text-sm text-[#5A6A86]">{trialLine} · No credit card · Work email required</p>}
             <ul className="mt-8 grid gap-2.5 text-sm text-[#3D4D6A] sm:grid-cols-2">
               {["Interviews available 24/7", "Questions tailored to each resume", "Evidence behind every assessment", "Your team makes every decision"].map((t) => (
                 <li key={t} className="flex items-center gap-2"><CheckCircle2 className="size-4 text-[#0B5BD3]" />{t}</li>
@@ -384,7 +398,7 @@ export default function Home() {
         <div className="mx-auto max-w-3xl px-5 sm:px-8">
           <SectionHead center eyebrow="FAQ" title="Questions recruiters ask us" />
           <div className="mt-10 divide-y divide-[#E3EAF5] rounded-2xl border border-[#DCE4F0]">
-            {FAQ.map(([q, a]) => (
+            {faqs.map(([q, a]) => (
               <details key={q} className="group px-6 py-5">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
                   {q}
@@ -407,10 +421,15 @@ export default function Home() {
               <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance text-white sm:text-[2.6rem] sm:leading-[1.15]">See PickMyHire.ai on your next open role</h2>
               <p className="mt-5 text-lg leading-relaxed text-[#D6E6FF]">Book a 20-minute demo. We&apos;ll show the full flow, from apply link to evidence-backed report, and talk through pricing for your hiring volume.</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-[#0B4FB8] hover:bg-[#EAF2FF]">Book a demo <ArrowRight className="size-4" /></a>
+                {trial.enabled && <Link href="/signup" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-[#0B4FB8] hover:bg-[#EAF2FF]">Start free trial <ArrowRight className="size-4" /></Link>}
+                <a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className={trial.enabled
+                  ? "inline-flex items-center justify-center gap-2 rounded-xl border border-white/40 px-6 py-3.5 text-base font-semibold text-white hover:bg-white/10"
+                  : "inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-[#0B4FB8] hover:bg-[#EAF2FF]"}>Book a demo {!trial.enabled && <ArrowRight className="size-4" />}</a>
               </div>
               <div className="flex-1" />
-              <p className="mt-8 text-sm text-[#BFD3F5]">Access is by approval. Request access with the form, or book a call, and we&apos;ll set up your workspace. Pricing: contact us.</p>
+              <p className="mt-8 text-sm text-[#BFD3F5]">{trial.enabled
+                ? <>Start a free trial in a minute ({trialLine}), or book a call and we&apos;ll set up your workspace. Pricing: contact us.</>
+                : <>Access is by approval. Request access with the form, or book a call, and we&apos;ll set up your workspace. Pricing: contact us.</>}</p>
             </div>
           </div>
           <AccessRequestForm />
@@ -437,6 +456,7 @@ export default function Home() {
           <div>
             <p className="text-sm font-semibold">Contact</p>
             <ul className="mt-4 space-y-2.5 text-sm text-[#5A6A86]">
+              {trial.enabled && <li><Link href="/signup" className="hover:text-[#0B5BD3]">Start free trial</Link></li>}
               <li><a href={DEMO_URL} target="_blank" rel="noopener noreferrer" className="hover:text-[#0B5BD3]">Book a demo</a></li>
               <li><a href="#contact" className="hover:text-[#0B5BD3]">Request access</a></li>
             </ul>

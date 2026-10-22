@@ -16,7 +16,7 @@ async function system<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promi
 test("job rounds and the invite round picker", async ({ page }) => {
   test.setTimeout(180_000);
   const id = Date.now().toString(36);
-  await page.goto("/signup");
+  await page.goto("/signup?code=1");
   await page.getByLabel("Full name").fill("Rory Recruiter");
   await page.getByLabel("Work email").fill(`rounds-${id}@e2e.test`);
   await page.getByLabel("Company / workspace name").fill(`Rounds UI ${id}`);

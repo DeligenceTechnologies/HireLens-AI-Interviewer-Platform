@@ -9,14 +9,18 @@ import { hashPassword, verifyPassword } from "@/lib/security/password";
 import { generateToken, hashToken } from "@/lib/security/tokens";
 import type { Role } from "@/lib/auth/permissions";
 import { OrgSettingsSchema } from "./org-settings";
-import { getDefaultQuota } from "./platform";
+import { getDefaultQuota, platformAudit } from "./platform";
 import { insertTemplate } from "./templates";
 
 function slugify(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "org";
 }
 
-export async function signup(input: { name: string; email: string; password: string; orgName?: string; inviteToken?: string; companyInviteToken?: string }) {
+export async function signup(input: {
+  name: string; email: string; password: string; orgName?: string; inviteToken?: string; companyInviteToken?: string;
+  /** Self-serve free trial: this many interviews for this many days. */
+  trial?: { interviews: number; days: number; domain: string };
+}) {
   const defaultQuota = await getDefaultQuota();
   const passwordHash = await hashPassword(input.password);
   return withSystem(async (tx) => {
@@ -33,6 +37,7 @@ export async function signup(input: { name: string; email: string; password: str
       if (!invite) throw new ApiError(400, "This invitation link is invalid or has expired.");
       if (invite.email.toLowerCase() !== input.email.toLowerCase()) throw new ApiError(400, "Please sign up with the email address the invitation was sent to.");
       await tx`insert into organization_members (organization_id, user_id, role) values (${invite.organization_id}, ${user.id}, ${invite.role})`;
+      await tx`update users set email_verified_at = now() where id = ${user.id}`;
       await tx`update organization_invites set accepted_at = now() where id = ${invite.id}`;
       await audit(tx, { orgId: invite.organization_id, userId: user.id, action: "team.joined", entityType: "user", entityId: user.id, metadata: { role: invite.role } });
       return { userId: user.id, orgId: invite.organization_id };
@@ -49,15 +54,20 @@ export async function signup(input: { name: string; email: string; password: str
       if (companyInvite.email.toLowerCase() !== input.email.toLowerCase()) throw new ApiError(400, "Please sign up with the email address this link was created for.");
     }
     const orgName = companyInvite?.company_name ?? (input.orgName?.trim() || `${input.name.split(" ")[0]}'s Team`);
-    const quota = companyInvite ? companyInvite.interview_quota : defaultQuota;
+    const trial = !companyInvite ? input.trial : undefined;
+    const quota = companyInvite ? companyInvite.interview_quota : trial ? trial.interviews : defaultQuota;
     const slug = `${slugify(orgName)}-${generateToken(6).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5)}`;
     const [org] = await tx<{ id: string }[]>`
-      insert into organizations (name, slug, settings, interview_quota, quota_counted_from)
-      values (${orgName}, ${slug}, ${json(OrgSettingsSchema.parse({}))}, ${quota}, now()) returning id`;
+      insert into organizations (name, slug, settings, interview_quota, quota_counted_from, plan, trial_ends_at, signup_domain)
+      values (${orgName}, ${slug}, ${json(OrgSettingsSchema.parse({}))}, ${quota}, now(),
+        ${trial ? "trial" : "standard"}, ${trial ? new Date(Date.now() + trial.days * 86_400_000) : null}, ${trial?.domain ?? null}) returning id`;
+    // Approval links prove the address (we sent it there); a trial confirms it by email when that's switched on.
+    if (companyInvite) await tx`update users set email_verified_at = now() where id = ${user.id}`;
     if (companyInvite) await tx`update company_invites set used_at = now(), organization_id = ${org.id} where id = ${companyInvite.id}`;
     await tx`insert into organization_members (organization_id, user_id, role) values (${org.id}, ${user.id}, 'owner')`;
     for (const [i, t] of DEFAULT_TEMPLATES.entries()) await insertTemplate(tx, org.id, user.id, t, i === 0);
     await audit(tx, { orgId: org.id, userId: user.id, action: "auth.signup", entityType: "organization", entityId: org.id });
+    if (trial) await platformAudit(tx, { adminId: null, action: "company.trial_started", targetType: "organization", targetId: org.id, details: { company: orgName, email: input.email, domain: trial.domain } });
     return { userId: user.id, orgId: org.id };
   });
 }
@@ -92,13 +102,37 @@ export async function requestPasswordReset(email: string) {
   await sendEmail({ to: email, subject: tpl.subject, text: tpl.text });
 }
 
+/** Email a link that confirms the user's address. */
+export async function sendEmailVerification(userId: string) {
+  const [user] = await withSystem((tx) => tx<{ email: string; name: string; email_verified_at: Date | null }[]>`
+    select email, name, email_verified_at from users where id = ${userId}`);
+  if (!user || user.email_verified_at) return { sent: false };
+  const token = generateToken();
+  await withSystem((tx) => tx`
+    insert into email_verifications (user_id, token_hash, expires_at) values (${userId}, ${hashToken(token)}, now() + interval '3 days')`);
+  const tpl = emailTemplates.verifyEmail({ name: user.name.split(" ")[0], link: `${env().APP_URL}/verify-email?token=${token}` });
+  return { sent: (await sendEmail({ to: user.email, subject: tpl.subject, text: tpl.text })).ok };
+}
+
+/** Confirm an email address from a verification link. Safe to open twice. */
+export async function verifyEmail(token: string) {
+  return withSystem(async (tx) => {
+    const [v] = await tx<{ id: string; user_id: string; used_at: Date | null }[]>`
+      select id, user_id, used_at from email_verifications where token_hash = ${hashToken(token)} and expires_at > now()`;
+    if (!v) return { ok: false as const };
+    await tx`update users set email_verified_at = coalesce(email_verified_at, now()) where id = ${v.user_id}`;
+    if (!v.used_at) await tx`update email_verifications set used_at = now() where id = ${v.id}`;
+    return { ok: true as const };
+  });
+}
+
 export async function resetPassword(token: string, password: string) {
   const passwordHash = await hashPassword(password);
   await withSystem(async (tx) => {
     const [r] = await tx<{ id: string; user_id: string }[]>`
       select id, user_id from password_resets where token_hash = ${hashToken(token)} and used_at is null and expires_at > now()`;
     if (!r) throw new ApiError(400, "This reset link is invalid or has expired.");
-    await tx`update users set password_hash = ${passwordHash} where id = ${r.user_id}`;
+    await tx`update users set password_hash = ${passwordHash}, email_verified_at = coalesce(email_verified_at, now()) where id = ${r.user_id}`;
     await tx`update password_resets set used_at = now() where id = ${r.id}`;
     await tx`delete from sessions where user_id = ${r.user_id}`;
   });

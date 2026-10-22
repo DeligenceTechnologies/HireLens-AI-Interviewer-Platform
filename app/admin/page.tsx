@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { AlertTriangle, Building2, Clock, Inbox, Users, Video } from "lucide-react";
-import { QuotaBadge } from "@/components/admin/quota-badge";
+import { AlertTriangle, Building2, Clock, Inbox, Sparkles, Users, Video } from "lucide-react";
+import { QuotaBadge, TrialBadge } from "@/components/admin/quota-badge";
 import { PageHeader } from "@/components/common/page-header";
 import { StatCard } from "@/components/common/stat-card";
 import { ISSUE_CATEGORIES } from "@/lib/feedback";
@@ -10,7 +10,7 @@ import { getOverview } from "@/lib/services/admin";
 export const metadata = { title: "Overview" };
 
 export default async function AdminOverviewPage() {
-  const { totals, month, outOfQuota, recentCompanies, recentIssues } = await getOverview();
+  const { totals, month, outOfQuota, recentCompanies, recentIssues, trials } = await getOverview();
   return (
     <>
       <PageHeader title="Platform overview" description="All companies on PickMyHire.ai." />
@@ -22,6 +22,28 @@ export default async function AdminOverviewPage() {
       </div>
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-2">
+        <section className="rounded-xl border bg-card lg:col-span-2">
+          <div className="flex items-center justify-between border-b px-5 py-3.5">
+            <h2 className="flex items-center gap-2 font-semibold"><Sparkles className="size-4 text-sky-600" /> Free trials</h2>
+            <Link href="/admin/companies?filter=trial" className="text-sm text-primary hover:underline">All trials</Link>
+          </div>
+          {trials.length === 0 ? <p className="px-5 py-8 text-center text-sm text-muted-foreground">No free trials yet.</p> : (
+            <ul className="divide-y">
+              {trials.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/admin/companies/${c.id}`} className="block truncate font-medium hover:text-primary">{c.name}</Link>
+                    <p className="truncate text-xs text-muted-foreground">{c.owner_email ?? "No owner"} · started {timeAgo(c.created_at)}</p>
+                    {c.same_domain > 0 && <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Same email domain as {c.same_domain} other trial{c.same_domain === 1 ? "" : "s"}: check it&apos;s genuine</p>}
+                  </div>
+                  <TrialBadge daysLeft={c.trial_days_left} />
+                  <QuotaBadge quota={c.interview_quota} used={c.used} inProgress={c.in_progress} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         <section className="rounded-xl border bg-card">
           <div className="flex items-center justify-between border-b px-5 py-3.5">
             <h2 className="flex items-center gap-2 font-semibold"><AlertTriangle className="size-4 text-amber-600" /> Out of free interviews</h2>

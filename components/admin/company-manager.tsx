@@ -19,7 +19,7 @@ const ROLE_LABEL: Record<Role, string> = { owner: "Owner", admin: "Admin", recru
 const MEMBER_ROLES: Exclude<Role, "owner">[] = ["admin", "recruiter", "interviewer", "viewer"];
 
 export type CompanyData = {
-  org: { id: string; name: string; status: "active" | "suspended"; suspended_at: string | null; created_at: string; admin_notes: string | null };
+  org: { id: string; name: string; status: "active" | "suspended"; suspended_at: string | null; created_at: string; admin_notes: string | null; plan: "standard" | "trial"; trial_ends_at: string | null; trial_days_left: number | null; signup_domain: string | null };
   members: { id: string; user_id: string; name: string; email: string; role: Role; created_at: string; disabled_at: string | null; last_seen_at: string | null }[];
   invites: { id: string; email: string; role: Role; expires_at: string }[];
   quota: { quota: number | null; used: number; inProgress: number; remaining: number | null; countedFrom: string };
@@ -38,6 +38,31 @@ export function SuspendButton({ id, name, status }: { id: string; name: string; 
     />
   ) : (
     <Button onClick={() => run("status", `/api/admin/companies/${id}`, { method: "PATCH", body: { status: "active" }, success: "Company reactivated" })}>Reactivate</Button>
+  );
+}
+
+/** Free-trial company: extend the trial or make it a full account. */
+export function TrialCard({ id, endsAt, daysLeft, domain }: { id: string; endsAt: string | null; daysLeft: number | null; domain: string | null }) {
+  const { run, pending } = useAction();
+  const ended = daysLeft === 0;
+  return (
+    <FormCard title="Free trial" description={`${ended ? "Ended" : "Ends"} ${endsAt ? formatDate(endsAt) : "—"}${domain ? ` · signed up with @${domain}` : ""}. Interviews follow the free interviews below.`}>
+      <div className="flex flex-wrap gap-2">
+        {[7, 14].map((d) => (
+          <Button key={d} variant="outline" size="sm" disabled={!!pending}
+            onClick={() => run(`extend${d}`, `/api/admin/companies/${id}`, { method: "PATCH", body: { extendTrialDays: d }, success: `Trial extended by ${d} days` })}>
+            {pending === `extend${d}` && <Loader2 className="animate-spin" />} Extend {d} days
+          </Button>
+        ))}
+        <ConfirmDialog
+          title="Convert to a full account?"
+          description="The trial label and end date are removed. Free interviews stay as set below, so adjust them if needed."
+          confirmLabel="Convert"
+          onConfirm={async () => { await run("convert", `/api/admin/companies/${id}`, { method: "PATCH", body: { convertTrial: true }, success: "Converted to a full account" }); }}
+          trigger={(open) => <Button size="sm" onClick={open}>Convert to full account</Button>}
+        />
+      </div>
+    </FormCard>
   );
 }
 

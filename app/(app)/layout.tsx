@@ -8,11 +8,14 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { UserMenu } from "@/components/layout/user-menu";
+import { TrialBanner } from "@/components/layout/trial-banner";
+import { getQuotaStatus } from "@/lib/services/quota";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const auth = await requireAuth();
   const live = aiIsLive();
   const hiddenNav = can(auth.role, "candidate:view") ? [] : ["/candidates"];
+  const quota = await getQuotaStatus(auth.orgId);
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-sidebar px-3 py-4 lg:flex">
@@ -41,6 +44,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <NotificationBell />
           <UserMenu name={auth.name} email={auth.email} role={roleLabel[auth.role]} />
         </header>
+        <TrialBanner quota={quota} email={auth.email} />
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
       </div>
     </div>

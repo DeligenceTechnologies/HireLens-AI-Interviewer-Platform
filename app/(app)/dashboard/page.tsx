@@ -29,7 +29,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
         actions={<>{can(auth.role, "candidate:write") && <Link href="/candidates?new=1" className={buttonVariants({ variant: "outline" })}>Add candidate</Link>}{can(auth.role, "job:write") && <Link href="/jobs/new" className={buttonVariants()}>New job</Link>}</>}
       />
       {sp.denied && <p className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">You don&apos;t have permission to view that page.</p>}
-      {quota.remaining !== null && quota.remaining <= 1 && can(auth.role, "interview:write") && (
+      {quota.plan !== "trial" && quota.remaining !== null && quota.remaining <= 1 && can(auth.role, "interview:write") && (
         <p className={`mb-6 flex items-start gap-2 rounded-lg border px-4 py-3 text-sm ${quota.remaining === 0 ? "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300" : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"}`}>
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
           <span>

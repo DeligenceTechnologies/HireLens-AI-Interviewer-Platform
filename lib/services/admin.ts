@@ -5,7 +5,7 @@ import type { Role } from "@/lib/auth/permissions";
 import { withSystem, type Tx } from "@/lib/database/db";
 import { env } from "@/lib/env";
 import { generateToken, hashToken } from "@/lib/security/tokens";
-import { platformAudit, writeSetting, getDefaultQuota, getSignupCode } from "./platform";
+import { platformAudit, writeSetting, getDefaultQuota, getSignupCode, getTrialSettings, type TrialSettings } from "./platform";
 import { COUNTED_STATUSES, RUNNING_STATUSES, WAITING_STATUSES, getQuotaStatus } from "./quota";
 
 // Platform admin operations across all companies. Everything runs in the
@@ -60,7 +60,13 @@ export async function getOverview() {
       select f.id, o.id as org_id, o.name as org_name, f.category, f.created_at
       from interview_feedback f join organizations o on o.id = f.organization_id
       where f.kind = 'issue' order by f.created_at desc limit 6`;
-    return { totals, month, outOfQuota, recentCompanies, recentIssues };
+    const trials = await tx<{ id: string; name: string; created_at: Date; trial_days_left: number | null; interview_quota: number | null; used: number; in_progress: number; owner_email: string | null; same_domain: number }[]>`
+      select o.id, o.name, o.created_at, case when o.trial_ends_at is null then null else greatest(0, ceil(extract(epoch from o.trial_ends_at - now()) / 86400))::int end as trial_days_left, o.interview_quota, q.used, q.in_progress,
+        (select u.email from organization_members m join users u on u.id = m.user_id where m.organization_id = o.id and m.role = 'owner' limit 1) as owner_email,
+        (select count(*)::int from organizations d where d.signup_domain = o.signup_domain and d.id <> o.id) as same_domain
+      from organizations o ${quotaCounts(tx)}
+      where o.plan = 'trial' order by o.created_at desc limit 8`;
+    return { totals, month, outOfQuota, recentCompanies, recentIssues, trials };
   });
 }
 
@@ -134,18 +140,20 @@ export async function revokeCompanyInvite(adminId: string, id: string) {
 // Companies
 // ---------------------------------------------------------------------------
 
-export type CompanyFilter = "all" | "active" | "suspended" | "out_of_quota";
+export type CompanyFilter = "all" | "active" | "trial" | "suspended" | "out_of_quota";
 
 export type CompanyRow = {
   id: string; name: string; status: "active" | "suspended"; created_at: Date; interview_quota: number | null;
   used: number; in_progress: number; members: number; owner_email: string | null; last_interview_at: Date | null;
+  plan: "standard" | "trial"; trial_days_left: number | null; same_domain: number;
 };
 
 export async function listCompanies(opts: { q?: string; filter?: CompanyFilter } = {}) {
   const q = opts.q?.trim() ? `%${opts.q.trim()}%` : null;
   const filter = opts.filter ?? "all";
   return withSystem((tx) => tx<CompanyRow[]>`
-    select o.id, o.name, o.status, o.created_at, o.interview_quota, q.used, q.in_progress,
+    select o.id, o.name, o.status, o.created_at, o.interview_quota, q.used, q.in_progress, o.plan, case when o.trial_ends_at is null then null else greatest(0, ceil(extract(epoch from o.trial_ends_at - now()) / 86400))::int end as trial_days_left,
+      (select count(*)::int from organizations d where d.signup_domain = o.signup_domain and d.id <> o.id) as same_domain,
       (select count(*)::int from organization_members m where m.organization_id = o.id) as members,
       (select u.email from organization_members m join users u on u.id = m.user_id where m.organization_id = o.id and m.role = 'owner' limit 1) as owner_email,
       (select max(i.created_at) from interviews i where i.organization_id = o.id) as last_interview_at
@@ -153,6 +161,7 @@ export async function listCompanies(opts: { q?: string; filter?: CompanyFilter }
     where true
       ${filter === "active" ? tx`and o.status = 'active'` : tx``}
       ${filter === "suspended" ? tx`and o.status = 'suspended'` : tx``}
+      ${filter === "trial" ? tx`and o.plan = 'trial'` : tx``}
       ${filter === "out_of_quota" ? tx`and o.interview_quota is not null and q.used + q.in_progress >= o.interview_quota` : tx``}
       ${q ? tx`and (o.name ilike ${q} or exists (select 1 from organization_members m join users u on u.id = m.user_id where m.organization_id = o.id and u.email::text ilike ${q}))` : tx``}
     order by o.created_at desc limit 300`);
@@ -160,8 +169,8 @@ export async function listCompanies(opts: { q?: string; filter?: CompanyFilter }
 
 export async function getCompany(id: string) {
   const company = await withSystem(async (tx) => {
-    const [org] = await tx<{ id: string; name: string; status: "active" | "suspended"; suspended_at: Date | null; created_at: Date; admin_notes: string | null }[]>`
-      select id, name, status, suspended_at, created_at, admin_notes from organizations where id = ${id}`;
+    const [org] = await tx<{ id: string; name: string; status: "active" | "suspended"; suspended_at: Date | null; created_at: Date; admin_notes: string | null; plan: "standard" | "trial"; trial_ends_at: Date | null; trial_days_left: number | null; signup_domain: string | null }[]>`
+      select o.id, o.name, o.status, o.suspended_at, o.created_at, o.admin_notes, o.plan, o.trial_ends_at, case when o.trial_ends_at is null then null else greatest(0, ceil(extract(epoch from o.trial_ends_at - now()) / 86400))::int end as trial_days_left, o.signup_domain::text from organizations o where o.id = ${id}`;
     if (!org) return null;
     const members = await tx<{ id: string; user_id: string; name: string; email: string; role: Role; created_at: Date; disabled_at: Date | null; last_seen_at: Date | null }[]>`
       select m.id, m.user_id, u.name, u.email, m.role, m.created_at, u.disabled_at,
@@ -188,10 +197,24 @@ export async function getCompany(id: string) {
   return { ...company, quota: await getQuotaStatus(id) };
 }
 
-export async function updateCompany(adminId: string, id: string, input: { quota?: number | null; notes?: string | null; status?: "active" | "suspended" }) {
+export async function updateCompany(adminId: string, id: string, input: {
+  quota?: number | null; notes?: string | null; status?: "active" | "suspended";
+  /** Free trial: add days (from today if it has already ended), or make it a full account. */
+  extendTrialDays?: number; convertTrial?: boolean;
+}) {
   await withSystem(async (tx) => {
-    const [before] = await tx<{ status: string; interview_quota: number | null }[]>`select status, interview_quota from organizations where id = ${id} for update`;
+    const [before] = await tx<{ status: string; interview_quota: number | null; plan: string; trial_ends_at: Date | null }[]>`select status, interview_quota, plan, trial_ends_at from organizations where id = ${id} for update`;
     if (!before) throw new ApiError(404, "Company not found");
+    if ((input.extendTrialDays || input.convertTrial) && before.plan !== "trial") throw new ApiError(400, "This company isn't on a free trial.");
+    if (input.extendTrialDays) {
+      await tx`update organizations set trial_ends_at = greatest(coalesce(trial_ends_at, now()), now()) + make_interval(days => ${input.extendTrialDays}) where id = ${id}`;
+      await platformAudit(tx, { adminId, action: "company.trial_extended", targetType: "organization", targetId: id, details: { days: input.extendTrialDays, ends_was: before.trial_ends_at } });
+    }
+    if (input.convertTrial) {
+      await tx`update organizations set plan = 'standard', trial_ends_at = null where id = ${id}`;
+      await platformAudit(tx, { adminId, action: "company.trial_converted", targetType: "organization", targetId: id });
+    }
+    if (input.quota === undefined && input.notes === undefined && !input.status) return;
     if (input.quota !== undefined) await tx`update organizations set interview_quota = ${input.quota} where id = ${id}`;
     if (input.notes !== undefined) await tx`update organizations set admin_notes = ${input.notes} where id = ${id}`;
     if (input.status && input.status !== before.status) {
@@ -339,11 +362,11 @@ export async function createPasswordResetLink(adminId: string, userId: string) {
 // ---------------------------------------------------------------------------
 
 export async function getPlatformSettings() {
-  const [signupCode, defaultQuota] = await Promise.all([getSignupCode(), getDefaultQuota()]);
-  return { signupCode, defaultQuota };
+  const [signupCode, defaultQuota, trial] = await Promise.all([getSignupCode(), getDefaultQuota(), getTrialSettings()]);
+  return { signupCode, defaultQuota, trial };
 }
 
-export async function savePlatformSettings(adminId: string, input: { signupCodeEnabled: boolean; signupCode: string | null; defaultQuota: number | null }) {
+export async function savePlatformSettings(adminId: string, input: { signupCodeEnabled: boolean; signupCode: string | null; defaultQuota: number | null; trial: TrialSettings }) {
   if (input.signupCodeEnabled && (!input.signupCode || input.signupCode.length < 8)) {
     throw new ApiError(400, "The access code needs at least 8 characters.");
   }
@@ -351,9 +374,10 @@ export async function savePlatformSettings(adminId: string, input: { signupCodeE
   await withSystem(async (tx) => {
     await writeSetting(tx, "signup_code", { enabled: input.signupCodeEnabled, code: input.signupCode || null }, adminId);
     await writeSetting(tx, "default_quota", { value: input.defaultQuota }, adminId);
+    await writeSetting(tx, "free_trial", input.trial, adminId);
     await platformAudit(tx, {
       adminId, action: "settings.updated", targetType: "platform", details: {
-        signup_code_enabled: input.signupCodeEnabled, signup_code_changed: before.code !== (input.signupCode || null), default_quota: input.defaultQuota,
+        signup_code_enabled: input.signupCodeEnabled, signup_code_changed: before.code !== (input.signupCode || null), default_quota: input.defaultQuota, free_trial: input.trial,
       },
     });
   });
