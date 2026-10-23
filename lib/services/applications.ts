@@ -6,7 +6,7 @@ import { ApiError } from "@/lib/api";
 import { reconcileMatch, screenApplicationAI, SCREENER_VERSION } from "@/lib/ai/application-screener";
 import { runInBackground } from "@/lib/background";
 import { env } from "@/lib/env";
-import { emailTemplates, sendEmail } from "@/lib/email";
+import { emailTemplates, sendEmail, replyToUser } from "@/lib/email";
 import { log } from "@/lib/logger";
 import { generateToken } from "@/lib/security/tokens";
 import type { ApplicationScreening, JobRequirements, MatchLevel, ResumeProfile } from "@/lib/validation/ai-schemas";
@@ -111,7 +111,9 @@ export async function submitApplication(slug: string, input: ApplyInput, file: {
   });
   runInBackground("application.confirm_email", async () => {
     const tpl = emailTemplates.applicationReceived({ candidateName: input.name.split(" ")[0], jobTitle: job.title, companyName: job.company_name });
-    await sendEmail({ to: input.email, subject: tpl.subject, text: tpl.text, orgId });
+    // Replies reach whoever created the job.
+    const [owner] = await withSystem((tx) => tx<{ created_by: string | null }[]>`select created_by from jobs where id = ${job.id}`);
+    await sendEmail({ to: input.email, subject: tpl.subject, text: tpl.text, orgId, replyTo: await replyToUser(owner?.created_by) });
   });
   log.info("application.received", { jobId: job.id, applicationId });
   return { applicationId };

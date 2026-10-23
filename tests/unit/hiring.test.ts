@@ -24,7 +24,7 @@ describe("calendar invite", () => {
     const ics = buildIcs({ ...base, sequence: 0, method: "REQUEST" });
     expect(ics).toContain("DTSTART:20261021T093000Z\r\nDTEND:20261021T101500Z");
     expect(ics).toContain("SUMMARY:Technical interview: Hana\\, Kim");
-    expect(ics).toContain("DESCRIPTION:Line 1\\nLine 2\; ok");
+    expect(ics).toContain("DESCRIPTION:Line 1\\nLine 2\\; ok");
     expect(ics.split("\r\n").every((l) => Buffer.byteLength(l) <= 75)).toBe(true);
   });
   it("cancels with the same UID and a higher sequence", () => {

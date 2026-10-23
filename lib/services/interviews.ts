@@ -4,7 +4,7 @@ import { audit } from "@/lib/audit";
 import { ApiError } from "@/lib/api";
 import { runInBackground } from "@/lib/background";
 import { env } from "@/lib/env";
-import { emailTemplates, sendEmail } from "@/lib/email";
+import { emailTemplates, sendEmail, replyToUser } from "@/lib/email";
 import { buildInterviewPlan } from "@/lib/interview/plan";
 import { generateToken, hashToken } from "@/lib/security/tokens";
 import type { StoredPlan, InterviewStatus } from "@/types/interview";
@@ -217,7 +217,7 @@ export async function sendInvitation(orgId: string, userId: string, interviewId:
     expiresAt: info.token_expires_at,
     roundName: info.round_name,
   });
-  await sendEmail({ to: info.candidate_email, subject: tpl.subject, text: tpl.text, orgId });
+  await sendEmail({ to: info.candidate_email, subject: tpl.subject, text: tpl.text, orgId, replyTo: await replyToUser(userId) });
 }
 
 /** Rotate the secure token (old link stops working) and optionally re-send the invite. */
@@ -256,7 +256,7 @@ export async function sendReminder(orgId: string, userId: string, interviewId: s
   });
   const link = interviewLink(token);
   const tpl = emailTemplates.reminder({ candidateName: info.candidate_name.split(" ")[0], jobTitle: info.job_title, companyName: info.org_name, link, roundName: info.round_name });
-  await sendEmail({ to: info.candidate_email, subject: tpl.subject, text: tpl.text, orgId });
+  await sendEmail({ to: info.candidate_email, subject: tpl.subject, text: tpl.text, orgId, replyTo: await replyToUser(userId) });
   return link;
 }
 

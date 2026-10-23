@@ -3,7 +3,13 @@ import { env } from "@/lib/env";
 import { withSystem } from "@/lib/database/db";
 import { log } from "@/lib/logger";
 
-export type EmailMessage = { to: string; subject: string; text: string; orgId?: string | null };
+export type EmailAttachment = { filename: string; content: string; contentType: string };
+export type EmailMessage = {
+  to: string; subject: string; text: string; orgId?: string | null;
+  /** Where replies go (e.g. the recruiter), since the From address has no mailbox. */
+  replyTo?: string | null;
+  attachments?: EmailAttachment[];
+};
 
 interface EmailProvider {
   name: string;
@@ -18,6 +24,17 @@ const logProvider: EmailProvider = {
   },
 };
 
+/** The Resend API request body (attachments are sent base64-encoded). */
+export function resendPayload(msg: EmailMessage, from: string | undefined) {
+  return {
+    from, to: msg.to, subject: msg.subject, text: msg.text,
+    ...(msg.replyTo ? { reply_to: msg.replyTo } : {}),
+    ...(msg.attachments?.length ? {
+      attachments: msg.attachments.map((a) => ({ filename: a.filename, content: Buffer.from(a.content).toString("base64"), content_type: a.contentType })),
+    } : {}),
+  };
+}
+
 const resendProvider: EmailProvider = {
   name: "resend",
   async send(msg) {
@@ -25,11 +42,22 @@ const resendProvider: EmailProvider = {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${e.EMAIL_PROVIDER_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: e.EMAIL_FROM, to: msg.to, subject: msg.subject, text: msg.text }),
+      body: JSON.stringify(resendPayload(msg, e.EMAIL_FROM)),
     });
     if (!res.ok) throw new Error(`Email provider returned ${res.status}`);
   },
 };
+
+/** "Name <email>" for a team member, used as the reply-to on emails sent on their behalf. */
+export async function replyToUser(userId: string | null | undefined): Promise<string | null> {
+  if (!userId) return null;
+  try {
+    const [u] = await withSystem((tx) => tx<{ name: string; email: string }[]>`select name, email from users where id = ${userId} and disabled_at is null`);
+    return u ? `${u.name.replace(/[<>"\\,;]/g, "").trim() || u.email} <${u.email}>` : null;
+  } catch {
+    return null;
+  }
+}
 
 function provider(): EmailProvider {
   return env().EMAIL_PROVIDER === "resend" ? resendProvider : logProvider;
@@ -46,9 +74,12 @@ export async function sendEmail(msg: EmailMessage): Promise<{ ok: boolean }> {
     error = err instanceof Error ? err.message : "send failed";
     log.warn("email.send_failed", { provider: p.name, error });
   }
+  // The outbox notes the reply-to and attachments too, so they're visible under Settings → Notifications.
+  const extras = [msg.replyTo && `Reply-to: ${msg.replyTo}`, ...(msg.attachments ?? []).map((a) => `Attached: ${a.filename}`)].filter(Boolean);
+  const logged = extras.length ? `${msg.text}\n\n---\n${extras.join("\n")}` : msg.text;
   await withSystem((tx) => tx`
     insert into email_outbox (organization_id, to_email, subject, body_text, provider, status, error)
-    values (${msg.orgId ?? null}, ${msg.to}, ${msg.subject}, ${msg.text}, ${p.name}, ${status}, ${error})`);
+    values (${msg.orgId ?? null}, ${msg.to}, ${msg.subject}, ${logged}, ${p.name}, ${status}, ${error})`);
   return { ok: status === "sent" };
 }
 
@@ -66,7 +97,7 @@ ${input.companyName} has invited you to ${input.roundName ? `the ${input.roundNa
 ${input.expiresAt ? `• This link expires on ${input.expiresAt.toUTCString()}.\n` : ""}
 Start your interview: ${input.link}
 
-This link is personal to you — please don't share it.
+This link is personal to you — please don't share it. Questions? Just reply to this email.
 
 ${input.companyName} hiring team`,
     };
@@ -78,7 +109,7 @@ ${input.companyName} hiring team`,
 
 Thank you for applying for the ${input.jobTitle} role at ${input.companyName}. We've received your application and resume.
 
-Our hiring team reviews every application. If your background is a match, we'll email you an invitation to the next step.
+Our hiring team reviews every application. If your background is a match, we'll email you an invitation to the next step. Questions? Just reply to this email.
 
 ${input.companyName} hiring team`,
     };
@@ -91,6 +122,8 @@ ${input.companyName} hiring team`,
 This is a friendly reminder that your ${input.roundName ? `${input.roundName} ` : ""}AI interview for the ${input.jobTitle} role at ${input.companyName} is still waiting for you.
 
 Start when you're ready: ${input.link}
+
+Questions? Just reply to this email.
 
 ${input.companyName} hiring team`,
     };
@@ -117,8 +150,9 @@ ${input.companyName} hiring team`,
       : input.kind === "rescheduled" ? `The ${what} has moved to a new time.${input.reason ? `\nReason: ${input.reason}` : ""}`
       : input.team ? `You're on the panel for the ${what}.` : `${input.companyName} would like to invite you to the ${input.roundName} interview for the ${input.jobTitle} role.`;
     const details = input.kind === "cancelled" ? "" : `\n\nWhen: ${input.when}\nWhere: ${input.where}\nWith: ${input.with}${input.message ? `\n\n${input.message}` : ""}`;
+    const calendar = input.kind === "cancelled" ? "\n\nThe attached calendar update removes it from your calendar." : "\n\nOpen the attached invite (invite.ics) to add it to your calendar.";
     const tail = input.team && input.link ? `\n\nInterview guide and scorecard: ${input.link}` : input.kind === "cancelled" ? "" : "\n\nIf this time doesn't work for you, please reply to let us know.";
-    return { subject, text: `Hi ${input.name},\n\n${lead}${details}${tail}\n\n${input.companyName}` };
+    return { subject, text: `Hi ${input.name},\n\n${lead}${details}${calendar}${tail}\n\n${input.companyName}` };
   },
   supportToAdmin(input: { kind: "new" | "reply"; company: string; name: string; email: string; category?: string; subject: string; message: string; link: string }) {
     return {

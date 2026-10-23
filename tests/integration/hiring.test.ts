@@ -79,6 +79,12 @@ describe("hiring decisions and human interviews", () => {
     // Invites go to the candidate and each interviewer (outbox while email isn't set up).
     const [{ n }] = await withSystem((tx) => tx<{ n: number }[]>`select count(*)::int as n from email_outbox where organization_id = ${orgId} and subject like '%Panel interview%'`);
     expect(n).toBe(3);
+    // Each one carries the calendar file, and replies go to whoever scheduled it.
+    const mails = await withSystem((tx) => tx<{ body_text: string }[]>`select body_text from email_outbox where organization_id = ${orgId} and subject like '%Panel interview%'`);
+    for (const m of mails) {
+      expect(m.body_text).toContain("Attached: invite.ics");
+      expect(m.body_text).toMatch(/Reply-to: Olivia Owner <owner-\d+-\w+@hiring\.test>/);
+    }
     const [assigned] = await withSystem((tx) => tx<{ n: number }[]>`select count(*)::int as n from notifications where organization_id = ${orgId} and type = 'human_interview.assigned' and user_id = ${interviewer}`);
     expect(assigned.n).toBe(1);
   });

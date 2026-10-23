@@ -4,7 +4,7 @@ import { ApiError } from "@/lib/api";
 import { audit, notify } from "@/lib/audit";
 import type { Role } from "@/lib/auth/permissions";
 import { json, withOrg, type Tx } from "@/lib/database/db";
-import { emailTemplates, sendEmail } from "@/lib/email";
+import { emailTemplates, sendEmail, replyToUser } from "@/lib/email";
 import { env } from "@/lib/env";
 import { DECISION_LABEL, DECISIONS, formatInZone, LOCATION_LABEL, LOCATION_TYPES, MAX_CRITERIA, type Decision, type HumanStatus, type LocationType } from "@/lib/hiring";
 import { buildIcs } from "@/lib/ics";
@@ -141,14 +141,20 @@ export function calendarFile(h: HumanInterview, audience: "candidate" | "team") 
   });
 }
 
-async function emailEveryone(h: HumanInterview, kind: "invite" | "rescheduled" | "cancelled", orgId: string, reason?: string | null) {
+/** Email the candidate and the panel, with a calendar file attached; replies go to whoever scheduled it. */
+async function emailEveryone(h: HumanInterview, kind: "invite" | "rescheduled" | "cancelled", orgId: string, userId: string, reason?: string | null) {
+  const replyTo = await replyToUser(userId);
+  const ics = (audience: "candidate" | "team") => [{
+    filename: "invite.ics", content: calendarFile(h, audience),
+    contentType: `text/calendar; charset=utf-8; method=${h.status === "cancelled" ? "CANCEL" : "REQUEST"}`,
+  }];
   const whenText = `${formatInZone(h.scheduled_at, h.timezone, { withYear: true })} (${h.duration_minutes} minutes)`;
   const base = { jobTitle: h.job_title, companyName: h.company_name, roundName: h.round_name, when: whenText, where: where(h), reason: reason ?? null };
   const toCandidate = emailTemplates.humanInterview({ ...base, kind, name: h.candidate_name.split(" ")[0], message: h.message, with: h.panel.map((p) => p.name).join(", ") });
-  await sendEmail({ to: h.candidate_email, subject: toCandidate.subject, text: toCandidate.text, orgId });
+  await sendEmail({ to: h.candidate_email, subject: toCandidate.subject, text: toCandidate.text, orgId, replyTo, attachments: ics("candidate") });
   for (const p of h.panel) {
     const t = emailTemplates.humanInterview({ ...base, kind, name: p.name.split(" ")[0], message: null, with: h.candidate_name, link: interviewLink(h.id), team: true });
-    await sendEmail({ to: p.email, subject: t.subject, text: t.text, orgId });
+    await sendEmail({ to: p.email, subject: t.subject, text: t.text, orgId, replyTo, attachments: ics("team") });
   }
 }
 
@@ -194,7 +200,7 @@ export async function scheduleHumanInterview(orgId: string, userId: string, inpu
     return row.id;
   });
   const h = (await withOrg(orgId, (tx) => load(tx, orgId, id)))!;
-  if (input.sendEmail) await emailEveryone(h, "invite", orgId);
+  if (input.sendEmail) await emailEveryone(h, "invite", orgId, userId);
   return { id };
 }
 
@@ -225,7 +231,7 @@ export async function rescheduleHumanInterview(orgId: string, userId: string, id
     await push(tx, id, { type: "rescheduled", at: new Date().toISOString(), by: userId, from: h.scheduled_at.toISOString(), to: input.scheduledAt, ...(input.reason ? { reason: input.reason.slice(0, 300) } : {}) });
     await audit(tx, { orgId, userId, action: "human_interview.rescheduled", entityType: "human_interview", entityId: id, metadata: { from: h.scheduled_at, to: input.scheduledAt } });
   });
-  if (input.sendEmail) await emailEveryone(h, "rescheduled", orgId, input.reason);
+  if (input.sendEmail) await emailEveryone(h, "rescheduled", orgId, userId, input.reason);
 }
 
 export async function cancelHumanInterview(orgId: string, userId: string, id: string, input: { reason: string; sendEmail: boolean }) {
@@ -235,7 +241,7 @@ export async function cancelHumanInterview(orgId: string, userId: string, id: st
     await push(tx, id, { type: "cancelled", at: new Date().toISOString(), by: userId, reason: input.reason.slice(0, 300) });
     await audit(tx, { orgId, userId, action: "human_interview.cancelled", entityType: "human_interview", entityId: id, metadata: { reason: input.reason.slice(0, 300) } });
   });
-  if (input.sendEmail) await emailEveryone(h, "cancelled", orgId, input.reason);
+  if (input.sendEmail) await emailEveryone(h, "cancelled", orgId, userId, input.reason);
 }
 
 /** Record what happened: completed, no-show, or back to scheduled (undo). */

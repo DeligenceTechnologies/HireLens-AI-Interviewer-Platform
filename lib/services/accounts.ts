@@ -3,7 +3,7 @@ import { json, withOrg, withSystem } from "@/lib/database/db";
 import { audit } from "@/lib/audit";
 import { ApiError } from "@/lib/api";
 import { env } from "@/lib/env";
-import { emailTemplates, sendEmail } from "@/lib/email";
+import { emailTemplates, sendEmail, replyToUser } from "@/lib/email";
 import { DEFAULT_TEMPLATES } from "@/lib/interview/default-templates";
 import { hashPassword, verifyPassword } from "@/lib/security/password";
 import { generateToken, hashToken } from "@/lib/security/tokens";
@@ -150,7 +150,7 @@ export async function inviteMember(auth: { orgId: string; orgName: string; userI
   });
   const link = `${env().APP_URL}/signup?invite=${token}`;
   const tpl = emailTemplates.teamInvite({ orgName: auth.orgName, inviter: auth.name, role, link });
-  await sendEmail({ to: email, subject: tpl.subject, text: tpl.text, orgId: auth.orgId });
+  await sendEmail({ to: email, subject: tpl.subject, text: tpl.text, orgId: auth.orgId, replyTo: await replyToUser(auth.userId) });
   return { link };
 }
 
