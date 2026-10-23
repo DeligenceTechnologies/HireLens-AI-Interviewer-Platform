@@ -10,21 +10,22 @@ import { getTrialSettings } from "@/lib/services/platform";
 
 export const metadata: Metadata = {
   title: { absolute: "Product demo · PickMyHire.ai" },
-  description: "Watch a 10-minute walkthrough of PickMyHire.ai, including a live AI video interview and the evidence-backed report.",
+  description: "Watch an 11-minute walkthrough of PickMyHire.ai: AI screening, a real AI video interview, the evidence-backed report, human interview rounds and the shortlist.",
   openGraph: {
     title: "PickMyHire.ai · Product demo",
-    description: "A 10-minute walkthrough with a live AI interview and the evidence-backed report.",
+    description: "An 11-minute walkthrough: a real AI interview, the evidence-backed report, human rounds and the shortlist.",
     images: ["/demo/og.jpg"],
   },
 };
 
 const CHAPTERS = [
-  "Jobs, AI-extracted requirements and interview templates",
+  "Jobs, AI-extracted requirements and interview rounds",
   "Public apply link and AI application screening",
-  "Inviting a candidate to an AI interview",
-  "A live AI interview, with personalized follow-ups",
+  "Inviting a candidate, with a branded email",
+  "The candidate's side, and a real AI interview",
   "The evidence-backed report, transcript and comparison",
-  "Team roles, settings and platform admin",
+  "Round decisions, human interviews and scorecards",
+  "Shortlist, team roles, branding and support",
 ];
 
 export default async function DemoPage() {
@@ -36,7 +37,7 @@ export default async function DemoPage() {
         <p className="text-center text-sm font-semibold tracking-[0.18em] text-[#0B5BD3] uppercase">Product demo</p>
         <h1 className="mt-3 text-center text-3xl font-bold tracking-tight text-balance sm:text-5xl">See PickMyHire.ai in action</h1>
         <p className="mx-auto mt-4 max-w-2xl text-center text-lg leading-relaxed text-[#4A5874]">
-          A 10-minute walkthrough, from creating a job to a live AI interview and the report your team reviews.
+          An 11-minute walkthrough, from creating a job to a real AI interview, the evidence-backed report, human interview rounds and the shortlist.
         </p>
         <DemoVideo className="mt-10" />
         <p className="mt-3 text-center text-xs text-[#7A8AA6]">Recorded with sample data.</p>
