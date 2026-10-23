@@ -6,6 +6,9 @@ import { safeEqual } from "@/lib/security/tokens";
 import { createSession } from "@/lib/auth/session";
 import { sendEmailVerification, signup } from "@/lib/services/accounts";
 import { emailDomain, isWorkEmail, WORK_EMAIL_MESSAGE } from "@/lib/validation/work-email";
+import { runInBackground } from "@/lib/background";
+import { emailPlatformAdmins, emailTemplates, mailbox } from "@/lib/email";
+import { env } from "@/lib/env";
 
 const Schema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
@@ -50,5 +53,11 @@ export const POST = route(async (req) => {
   const { userId, orgId } = await signup({ ...input, trial, companyInviteToken: input.inviteToken ? undefined : input.companyInvite });
   await createSession(userId, orgId);
   if (trial && (await getTrialSettings()).requireVerification) await sendEmailVerification(userId);
+  if (trial) {
+    const t = trial;
+    runInBackground("trial.email_admins", () => emailPlatformAdmins(emailTemplates.trialToAdmin({
+      company: input.orgName!, name: input.name, email: input.email, interviews: t.interviews, days: t.days, link: `${env().APP_URL}/admin/companies/${orgId}`,
+    }), mailbox(input.name, input.email)));
+  }
   return { ok: true };
 }, { rateLimit: { key: "signup", limit: 10, windowMs: 60 * 60_000 } });

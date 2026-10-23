@@ -4,9 +4,8 @@ import { ApiError } from "@/lib/api";
 import { audit, notify } from "@/lib/audit";
 import type { AuthContext } from "@/lib/auth/session";
 import { withOrg, withSystem, type Tx } from "@/lib/database/db";
-import { emailTemplates, sendEmail } from "@/lib/email";
+import { emailPlatformAdmins as emailAdmins, emailTemplates, sendEmail } from "@/lib/email";
 import { env } from "@/lib/env";
-import { log } from "@/lib/logger";
 import { platformAudit } from "./platform";
 
 // Help and support: signed-in customers write to the platform team, and the
@@ -45,15 +44,6 @@ const visible = (tx: Tx, auth: Pick<AuthContext, "userId" | "role">) => (seesAll
 const ticketLink = (id: string) => `${env().APP_URL}/help/${id}`;
 const adminLink = (id: string) => `${env().APP_URL}/admin/support/${id}`;
 
-/** Email every platform admin (best effort; the request itself is already saved). */
-async function emailAdmins(tpl: { subject: string; text: string }) {
-  try {
-    const admins = await withSystem((tx) => tx<{ email: string }[]>`select email from users where is_platform_admin and disabled_at is null`);
-    for (const a of admins) await sendEmail({ to: a.email, ...tpl });
-  } catch (err) {
-    log.warn("support.email_admins_failed", { err });
-  }
-}
 
 export async function createTicket(auth: AuthContext, input: z.infer<typeof CreateTicketSchema>) {
   const id = await withOrg(auth.orgId, async (tx) => {

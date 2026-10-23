@@ -48,12 +48,25 @@ const resendProvider: EmailProvider = {
   },
 };
 
+/** `Name <email>` for a reply-to header (characters that would break the header are dropped). */
+export const mailbox = (name: string, email: string) => `${name.replace(/[<>"\\,;]/g, "").trim() || email} <${email}>`;
+
+/** Email every platform admin (best effort: the thing it's about is already saved). */
+export async function emailPlatformAdmins(tpl: { subject: string; text: string }, replyTo?: string | null) {
+  try {
+    const admins = await withSystem((tx) => tx<{ email: string }[]>`select email from users where is_platform_admin and disabled_at is null`);
+    for (const a of admins) await sendEmail({ to: a.email, ...tpl, replyTo });
+  } catch (err) {
+    log.warn("email.platform_admins_failed", { err });
+  }
+}
+
 /** "Name <email>" for a team member, used as the reply-to on emails sent on their behalf. */
 export async function replyToUser(userId: string | null | undefined): Promise<string | null> {
   if (!userId) return null;
   try {
     const [u] = await withSystem((tx) => tx<{ name: string; email: string }[]>`select name, email from users where id = ${userId} and disabled_at is null`);
-    return u ? `${u.name.replace(/[<>"\\,;]/g, "").trim() || u.email} <${u.email}>` : null;
+    return u ? mailbox(u.name, u.email) : null;
   } catch {
     return null;
   }
@@ -162,6 +175,24 @@ ${input.companyName} hiring team`,
 ${input.message}
 
 Open in admin: ${input.link}`,
+    };
+  },
+  inquiryToAdmin(input: { topic: string; name: string; email: string; company: string | null; phone: string | null; teamSize: string | null; message: string | null; link: string }) {
+    const details = [
+      `From: ${input.name} <${input.email}>`,
+      input.company && `Company: ${input.company}`,
+      input.phone && `Phone: ${input.phone}`,
+      input.teamSize && `Team size: ${input.teamSize} employees`,
+    ].filter(Boolean).join("\n");
+    return {
+      subject: `New inquiry: ${input.topic}${input.company ? ` (${input.company})` : ` from ${input.name}`}`,
+      text: `${details}${input.message ? `\n\n${input.message}` : ""}\n\nReply to this email to answer ${input.name} directly, or open it in admin: ${input.link}`,
+    };
+  },
+  trialToAdmin(input: { company: string; name: string; email: string; interviews: number; days: number; link: string }) {
+    return {
+      subject: `New free trial: ${input.company}`,
+      text: `${input.name} <${input.email}> started a free trial for ${input.company} (${input.interviews} interviews for ${input.days} days).\n\nReply to this email to reach them directly, or open the company in admin: ${input.link}`,
     };
   },
   supportReply(input: { name: string; subject: string; message: string; link: string }) {

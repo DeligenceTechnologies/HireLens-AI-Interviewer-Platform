@@ -2,7 +2,10 @@ import { z } from "zod";
 import { body, route } from "@/lib/api";
 import { withSystem } from "@/lib/database/db";
 import { log } from "@/lib/logger";
-import { INQUIRY_TOPICS } from "@/lib/marketing";
+import { runInBackground } from "@/lib/background";
+import { emailPlatformAdmins, emailTemplates, mailbox } from "@/lib/email";
+import { env } from "@/lib/env";
+import { INQUIRY_TOPIC_LABEL, INQUIRY_TOPICS } from "@/lib/marketing";
 
 const Schema = z.object({
   topic: z.enum(INQUIRY_TOPICS).default("access"),
@@ -29,5 +32,10 @@ export const POST = route(async (req) => {
     values (${input.topic}, ${input.topic === "other" ? input.topic_other : null}, ${input.name}, ${input.email}, ${input.company},
             ${input.team_size ?? null}, ${input.phone}, ${input.message}, ${input.topic === "access" ? "home_page" : "contact_form"})`);
   log.info("access_request.received", { topic: input.topic, email_domain: input.email.split("@")[1] });
+  runInBackground("access_request.email_admins", () => emailPlatformAdmins(emailTemplates.inquiryToAdmin({
+    topic: input.topic === "other" && input.topic_other ? `Other: ${input.topic_other}` : INQUIRY_TOPIC_LABEL[input.topic],
+    name: input.name, email: input.email, company: input.company, phone: input.phone, teamSize: input.team_size ?? null, message: input.message,
+    link: `${env().APP_URL}/admin/requests?topic=${input.topic}`,
+  }), mailbox(input.name, input.email)));
   return { ok: true };
 }, { rateLimit: { key: "access-request", limit: 5, windowMs: 60 * 60_000 } });
