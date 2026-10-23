@@ -467,7 +467,7 @@ export async function completeInterview(token: string, input: { reason: "finishe
   runInBackground("interview.process", () => processInterview(ctx.orgId, ctx.id));
   runInBackground("interview.notify", async () => {
     const tpl = emailTemplates.completed({ candidateName: ctx.candidateName, jobTitle: ctx.jobTitle, link: `${env().APP_URL}/interviews/${ctx.id}` });
-    for (const r of recruiters) await sendEmail({ to: r.email, subject: tpl.subject, text: tpl.text, orgId: ctx.orgId });
+    for (const r of recruiters) await sendEmail({ to: r.email, ...tpl, orgId: ctx.orgId });
   });
   return { status: "completed" as const };
 }

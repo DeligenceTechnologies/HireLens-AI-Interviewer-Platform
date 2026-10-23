@@ -3,7 +3,7 @@ import { json, withOrg, withSystem } from "@/lib/database/db";
 import { audit } from "@/lib/audit";
 import { ApiError } from "@/lib/api";
 import { env } from "@/lib/env";
-import { emailTemplates, sendEmail, replyToUser } from "@/lib/email";
+import { companyBrand, emailTemplates, replyToUser, sendEmail } from "@/lib/email";
 import { DEFAULT_TEMPLATES } from "@/lib/interview/default-templates";
 import { hashPassword, verifyPassword } from "@/lib/security/password";
 import { generateToken, hashToken } from "@/lib/security/tokens";
@@ -99,7 +99,7 @@ export async function requestPasswordReset(email: string) {
   await withSystem((tx) => tx`
     insert into password_resets (user_id, token_hash, expires_at) values (${user.id}, ${hashToken(token)}, now() + interval '1 hour')`);
   const tpl = emailTemplates.passwordReset({ link: `${env().APP_URL}/reset-password?token=${token}` });
-  await sendEmail({ to: email, subject: tpl.subject, text: tpl.text });
+  await sendEmail({ to: email, ...tpl });
 }
 
 /** Email a link that confirms the user's address. */
@@ -111,7 +111,7 @@ export async function sendEmailVerification(userId: string) {
   await withSystem((tx) => tx`
     insert into email_verifications (user_id, token_hash, expires_at) values (${userId}, ${hashToken(token)}, now() + interval '3 days')`);
   const tpl = emailTemplates.verifyEmail({ name: user.name.split(" ")[0], link: `${env().APP_URL}/verify-email?token=${token}` });
-  return { sent: (await sendEmail({ to: user.email, subject: tpl.subject, text: tpl.text })).ok };
+  return { sent: (await sendEmail({ to: user.email, ...tpl })).ok };
 }
 
 /** Confirm an email address from a verification link. Safe to open twice. */
@@ -150,7 +150,7 @@ export async function inviteMember(auth: { orgId: string; orgName: string; userI
   });
   const link = `${env().APP_URL}/signup?invite=${token}`;
   const tpl = emailTemplates.teamInvite({ orgName: auth.orgName, inviter: auth.name, role, link });
-  await sendEmail({ to: email, subject: tpl.subject, text: tpl.text, orgId: auth.orgId, replyTo: await replyToUser(auth.userId) });
+  await sendEmail({ to: email, ...tpl, orgId: auth.orgId, replyTo: await replyToUser(auth.userId), brand: await companyBrand(auth.orgId) });
   return { link };
 }
 
