@@ -15,6 +15,7 @@ import type { InterviewFeedbackRow } from "@/lib/services/feedback";
 import { ISSUE_CATEGORIES } from "@/lib/feedback";
 import type { StoredReport } from "@/lib/interview/processing";
 import type { AnswerAnalysis } from "@/lib/validation/ai-schemas";
+import { DownloadMenu } from "./download-menu";
 import { InterviewTimeline } from "./interview-timeline";
 import { VideoPlayer, type RecordingPart, type VideoPlayerHandle } from "./video-player";
 
@@ -116,6 +117,11 @@ export function InterviewViewer({ detail, initialTab, showScores, canViewRecordi
     <div className={cn("space-y-3", compact && "lg:sticky lg:top-20")}>
       <VideoPlayer ref={player} parts={parts} voice={voice} error={recError} onTime={setCurrentMs} />
       <InterviewTimeline sections={sectionsForTimeline} totalMs={totalMs} currentMs={currentMs} onSeek={(ms) => jump(ms)} />
+      {!compact && (
+        <div className="flex justify-end">
+          <DownloadMenu interviewId={detail.id} name={`${detail.candidate_name} - ${detail.job_title}`} parts={canViewRecording ? parts : null} voice={canViewRecording ? voice : null} />
+        </div>
+      )}
       {compact && (
         <TranscriptViewer className="h-[42vh]" segments={segments} currentMs={currentMs} focusedId={focused} onSeek={(ms, id) => jump(ms, id)} sections={detail.sections} />
       )}
