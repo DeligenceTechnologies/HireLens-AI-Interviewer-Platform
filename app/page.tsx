@@ -6,7 +6,7 @@ import {
   Timer, UserCheck, Users, Video, X, Calculator, Code2, GraduationCap, Headphones, HeartPulse, Megaphone, Store, Truck, Workflow,
 } from "lucide-react";
 import { Copyright, Logo } from "@/components/layout/logo";
-import { InterviewMock, PipelineMock, ReportMock, ScreeningMock } from "@/components/marketing/mocks";
+import { IdentityMock, InterviewMock, PipelineMock, ReportMock, ScreeningMock } from "@/components/marketing/mocks";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { DemoVideo } from "@/components/marketing/demo-video";
 import { ContactForms } from "@/components/marketing/access-request-form";
@@ -58,6 +58,7 @@ const COMPARE: [string, string, string][] = [
   ["Personalization", "Generic scripts or improvised questions", "Questions built from the job and each resume"],
   ["Notes", "Partial notes written from memory", "Full transcript, recording and structured report"],
   ["Verification", "“Trust me, they were strong”", "Every assessment links to the exact moment"],
+  ["Identity", "No easy way to confirm who is on the call", "Face checked against a photo from the setup check"],
   ["Later rounds", "Notes scattered across email and spreadsheets", "Every round, scorecard and decision on one candidate page"],
   ["Recruiter time", "About an hour per candidate", "About 10 minutes of review"],
 ];
@@ -140,6 +141,7 @@ const FAQ = [
   ["How does the AI decide what to ask?", "Each interview follows your template: sections, timing, number of questions and follow-up limits. Within that structure the AI personalizes questions from the job and the candidate's resume, and asks a follow-up only when an answer leaves a specific gap."],
   ["How do I know the assessments are right?", "You don't have to take them on trust. Every assessment comes with evidence: click it and the recording jumps to that moment, with the transcript highlighted."],
   ["Does it work for my industry?", "Yes, for any role where a structured conversation shows fit: technology, sales, support, finance, operations, healthcare administration, education and more. Questions come from your job description and each candidate's resume, and templates let you set the sections and criteria for each role. Interviews are currently in English, and they assess what candidates say, so hands-on skills such as live coding or practical trade work still need their own test."],
+  ["Can you tell if someone else takes the interview?", "Yes, with the identity check, which you can switch on for each job. The candidate's photo is taken at the setup check, and during the AI interview their face is compared with it every few seconds. A different face, a second person in view or an empty frame is flagged with a photo and a link to that moment in the recording. Candidates are told about it and consent first, and the photos are deleted with the recording. Flags are for your team to review: they never end or reject an interview."],
   ["How long is an interview?", "You decide in the template. Typical setups range from a 15-minute screen to a 45-minute structured technical interview."],
   ["What happens if a candidate's connection drops?", "Progress is saved continuously. The candidate reopens their link and continues where they left off, and the recording is kept in parts."],
   ["Can we run human interviews too?", "Yes. Add human rounds to a job, or schedule a one-off interview for a single candidate. Pick the panel, date and time zone, and send the invite. Each interviewer fills in a scorecard with your criteria, and your team marks the round Qualified, Not qualified or On hold. Scorecards lock once a decision is made."],
@@ -297,6 +299,18 @@ export default async function Home() {
               </ul>
             </div>
             <div className="lg:order-1"><PipelineMock /><p className="mt-3 text-center text-xs text-[#7A8AA6]">Sample hiring progress</p></div>
+          </div>
+
+          <div className="grid items-center gap-12 lg:grid-cols-2">
+            <div>
+              <SectionHead eyebrow="Identity check" title="Know it's the same person, from start to finish" />
+              <ul className="mt-7 space-y-3.5 text-base text-[#3D4D6A]">
+                {["A photo is taken at the setup check, before the interview starts", "The candidate's face is compared with it every few seconds, on their own device", "Flags a different face, a second person in view, or no one in view", "Each flag has a photo and jumps to that moment in the video", "Candidates are told and give consent first. Flags are for your team to review, and never end or reject an interview", "Switch it on or off for each job"].map((t) => (
+                  <li key={t} className="flex gap-3"><Check className="mt-0.5 size-5 shrink-0 text-[#0B5BD3]" />{t}</li>
+                ))}
+              </ul>
+            </div>
+            <div><IdentityMock /><p className="mt-3 text-center text-xs text-[#7A8AA6]">Sample identity check</p></div>
           </div>
 
           <div>

@@ -1,6 +1,6 @@
 // Illustrative product previews for the marketing page, built from the same
 // visual language as the app. Content is sample data, labelled as such.
-import { Bot, CheckCircle2, CircleDashed, Mic, PlayCircle, Radio, Sparkles, Star, Users } from "lucide-react";
+import { AlertTriangle, Bot, CheckCircle2, CircleDashed, Mic, PlayCircle, Radio, ScanFace, Sparkles, Star, UserX, Users } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
@@ -189,6 +189,45 @@ export function PipelineMock() {
         </ol>
         <div className="rounded-xl bg-[#F0F5FD] p-3 text-[11px] leading-relaxed text-[#3D4D6A]">
           <span className="font-semibold text-[#0F1F3A]">All rounds qualified</span> · Shortlisted by Anita R. on 14 Oct · Scorecards locked
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+/** Identity check: the reference photo, a random check and one flag to review. */
+export function IdentityMock() {
+  const photo = (label: string) => (
+    <div className="relative aspect-[4/3] overflow-hidden bg-[#EEF2F8]">
+      <Image src="/marketing/candidate-interview.jpg" alt={label} fill sizes="(min-width: 1024px) 180px, 45vw" className="object-cover" />
+    </div>
+  );
+  const items = [
+    { label: "Reference photo", detail: "Setup check", time: null, flagged: false, image: photo("Sample reference photo taken at the setup check") },
+    { label: "Random check", detail: "Match", time: "08:12", flagged: false, image: photo("Sample random check photo matching the reference") },
+    { label: "No face in view", detail: "Flagged", time: "14:05", flagged: true, image: <div className="flex aspect-[4/3] items-center justify-center bg-[#E9EEF5]"><UserX className="size-8 text-[#9AA8BF]" /></div> },
+  ];
+  return (
+    <Frame>
+      <div className="flex items-center justify-between gap-2 border-b border-[#E8EEF7] px-5 py-3.5">
+        <p className="flex items-center gap-2 text-sm font-semibold text-[#0F1F3A]"><ScanFace className="size-4 text-[#0B5BD3]" /> Identity check</p>
+        <span className="inline-flex items-center gap-1 rounded-full bg-[#FDF0D9] px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-[#8A5300]"><AlertTriangle className="size-3.5" /> Needs review · 1 flag</span>
+      </div>
+      <div className="space-y-4 p-5">
+        <p className="text-xs leading-relaxed text-[#5A6A86]">The candidate left the frame once. Watch that moment before deciding anything.</p>
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          {items.map((it) => (
+            <div key={it.label} className="overflow-hidden rounded-xl border border-[#E3EAF5]">
+              {it.image}
+              <div className="px-2 py-2 sm:px-2.5">
+                <p className={cn("text-[11px] font-semibold", it.flagged ? "text-[#8A5300]" : "text-[#0F1F3A]")}>{it.label}</p>
+                <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-1 text-[11px] text-[#5A6A86]">
+                  <span className="flex items-center gap-1">{it.detail === "Match" && <CheckCircle2 className="size-3 text-[#0B6B3A]" />}{it.detail}</span>
+                  {it.time && <span className="inline-flex items-center gap-0.5 font-mono font-semibold text-[#0B5BD3]"><PlayCircle className="size-3" />{it.time}</span>}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </Frame>
