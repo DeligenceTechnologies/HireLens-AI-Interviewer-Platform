@@ -16,6 +16,7 @@ import { ISSUE_CATEGORIES } from "@/lib/feedback";
 import type { StoredReport } from "@/lib/interview/processing";
 import type { AnswerAnalysis } from "@/lib/validation/ai-schemas";
 import { DownloadMenu } from "./download-menu";
+import { FaceVerificationCard, type FaceVerification } from "./face-verification-card";
 import { InterviewTimeline } from "./interview-timeline";
 import { VideoPlayer, type RecordingPart, type VideoPlayerHandle } from "./video-player";
 
@@ -48,8 +49,9 @@ function Card({ title, children, className, action }: { title?: React.ReactNode;
   );
 }
 
-export function InterviewViewer({ detail, initialTab, showScores, canViewRecording, canRegenerate, canViewCandidates, feedback = [] }: {
+export function InterviewViewer({ detail, initialTab, showScores, canViewRecording, canRegenerate, canViewCandidates, feedback = [], face = null }: {
   detail: Detail;
+  face?: FaceVerification | null;
   feedback?: InterviewFeedbackRow[];
   initialTab: ViewerTab;
   showScores: boolean;
@@ -161,7 +163,7 @@ export function InterviewViewer({ detail, initialTab, showScores, canViewRecordi
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
           <div className="min-w-0 space-y-6">
-            {tab === "overview" && <Overview detail={detail} report={report} showScores={showScores} jump={jump} onOpenReport={() => switchTab("report")} canViewCandidates={canViewCandidates} feedback={feedback} />}
+            {tab === "overview" && <Overview detail={detail} report={report} showScores={showScores} jump={jump} onOpenReport={() => switchTab("report")} canViewCandidates={canViewCandidates} feedback={feedback} face={face} canViewPhotos={canViewRecording} />}
             {tab === "report" && <ReportView detail={detail} report={report} showScores={showScores} jump={jump} />}
             {tab === "questions" && <QuestionsView detail={detail} jump={jump} />}
             {tab === "evaluation" && <EvaluationView detail={detail} showScores={showScores} jump={jump} />}
@@ -185,7 +187,7 @@ function Disclaimer({ source }: { source?: string }) {
   );
 }
 
-function Overview({ detail, report, showScores, jump, onOpenReport, canViewCandidates, feedback }: { detail: Detail; report: StoredReport | null | undefined; showScores: boolean; jump: (ms: number, id?: string | null) => void; onOpenReport: () => void; canViewCandidates: boolean; feedback: InterviewFeedbackRow[] }) {
+function Overview({ detail, report, showScores, jump, onOpenReport, canViewCandidates, feedback, face, canViewPhotos }: { detail: Detail; report: StoredReport | null | undefined; showScores: boolean; jump: (ms: number, id?: string | null) => void; onOpenReport: () => void; canViewCandidates: boolean; feedback: InterviewFeedbackRow[]; face: FaceVerification | null; canViewPhotos: boolean }) {
   const completedSections = detail.sections.filter((s) => s.status === "completed").length;
   return (
     <>
@@ -198,6 +200,7 @@ function Overview({ detail, report, showScores, jump, onOpenReport, canViewCandi
           <div key={k} className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">{k}</p><p className="mt-1 text-lg font-semibold tabular">{v}</p></div>
         ))}
       </div>
+      {face && <FaceVerificationCard interviewId={detail.id} face={face} canViewPhotos={canViewPhotos} onJump={(ms) => jump(ms)} />}
       {feedback.length > 0 && <CandidateFeedbackCard items={feedback} />}
       {report ? (
         <Card title={<span className="flex items-center gap-2"><Sparkles className="size-4 text-primary" /> Summary</span>} action={<Button size="sm" variant="ghost" onClick={onOpenReport}>Full report</Button>}>

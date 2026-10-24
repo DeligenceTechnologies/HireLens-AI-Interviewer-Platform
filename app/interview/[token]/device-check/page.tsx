@@ -12,7 +12,7 @@ export default async function DeviceCheckPage(props: PageProps<"/interview/[toke
   if (step === "welcome") redirect(`/interview/${token}/consent`);
   return (
     <CandidateShell brand={data.brand} job={data.job_title} step={2}>
-      <DeviceCheck token={token} planReady={data.plan_ready} />
+      <DeviceCheck token={token} planReady={data.plan_ready} faceVerification={data.face_verification} />
     </CandidateShell>
   );
 }

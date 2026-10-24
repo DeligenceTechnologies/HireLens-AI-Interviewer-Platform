@@ -5,6 +5,7 @@ import { ApiError } from "@/lib/api";
 import { assignableRoles, type Role } from "@/lib/auth/permissions";
 import { log } from "@/lib/logger";
 import { paths, storage } from "@/lib/storage";
+import { deleteFaceDataTx, facePaths } from "@/lib/interview/face";
 import { OrgSettingsSchema, readSettings, type OrgSettings } from "./org-settings";
 
 export async function getDashboard(orgId: string, opts: { includeCandidateData: boolean }) {
@@ -161,7 +162,10 @@ export async function deleteInterviewData(orgId: string, userId: string | null, 
   await withOrg(orgId, async (tx) => {
     const [iv] = await tx`select id from interviews where id = ${interviewId} and organization_id = ${orgId}`;
     if (!iv) throw new ApiError(404, "Interview not found");
-    if (what === "recording" || what === "all") await tx`update recordings set status = 'deleted' where interview_id = ${interviewId}`;
+    if (what === "recording" || what === "all") {
+      await tx`update recordings set status = 'deleted' where interview_id = ${interviewId}`;
+      await deleteFaceDataTx(tx, interviewId);
+    }
     if (what === "transcript" || what === "all") {
       await tx`delete from transcript_segments where interview_id = ${interviewId}`;
       await tx`update interview_answers set transcript_text = '[deleted]', analysis = null where interview_id = ${interviewId}`;
@@ -175,7 +179,10 @@ export async function deleteInterviewData(orgId: string, userId: string | null, 
     if (what === "all") await tx`delete from interviews where id = ${interviewId}`;
     await audit(tx, { orgId, userId, action: "interview.data_deleted", entityType: "interview", entityId: interviewId, metadata: { what } });
   });
-  if (what === "recording" || what === "all") await storage().deletePrefix(`${paths.interviewPrefix(orgId, interviewId)}recording/`);
+  if (what === "recording" || what === "all") {
+    await storage().deletePrefix(`${paths.interviewPrefix(orgId, interviewId)}recording/`);
+    await storage().deletePrefix(facePaths.prefix(orgId, interviewId));
+  }
   if (what === "all") await storage().deletePrefix(paths.interviewPrefix(orgId, interviewId));
 }
 

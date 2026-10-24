@@ -1,10 +1,25 @@
 import { expect, test } from "@playwright/test";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 
 // End-to-end: recruiter signs up → creates job → invites candidate with resume →
 // candidate consents, passes device check, completes the interview (demo AI mode,
 // typed answers) → recruiter sees transcript and report.
-// Requires the app running with AI_PROVIDER=mock or without OPENAI_API_KEY.
+// Requires the app running with AI_PROVIDER=mock or without OPENAI_API_KEY, and ffmpeg.
+
+// The fake camera shows a face (the website's marketing photo) for 25 s, then an
+// empty frame for 25 s, on a loop: the identity check takes its photo from the
+// face and flags the moments with no one in view. (Y4M carries its frame rate.)
+const camera = path.join(__dirname, "../../test-results/face-camera.y4m");
+if (!existsSync(camera)) {
+  mkdirSync(path.dirname(camera), { recursive: true });
+  execFileSync("ffmpeg", ["-v", "error", "-y", "-loop", "1", "-t", "25", "-i", path.join(__dirname, "../../public/marketing/candidate-interview.jpg"),
+    "-f", "lavfi", "-t", "25", "-i", "color=c=gray:s=320x240",
+    "-filter_complex", "[0]scale=320:240,setsar=1,fps=5,format=yuv420p[a];[1]fps=5,setsar=1,format=yuv420p[b];[a][b]concat=n=2:v=1",
+    "-pix_fmt", "yuv420p", camera]);
+}
+test.use({ launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required", `--use-file-for-fake-video-capture=${camera}`] } });
 
 const LONG_ANSWER =
   "In my current role I personally owned the payments platform. I designed the webhook processing service in Node.js, " +
@@ -75,6 +90,8 @@ test("recruiter to candidate to report", async ({ page, browser }) => {
   });
   await expect(cand.getByText(/We can hear you/)).toBeVisible({ timeout: 30_000 });
   await expect(cand.getByText("Test recording worked")).toBeVisible({ timeout: 20_000 });
+  // Identity check (on by default for new jobs): the photo is taken automatically.
+  await expect(cand.getByText(/Photo taken\. It's compared with you/)).toBeVisible({ timeout: 30_000 });
   if (process.env.E2E_SCREENSHOTS) await cand.screenshot({ path: "test-results/device-check.png" });
   await cand.getByRole("button", { name: "I heard it" }).click();
   await expect(cand.getByText(/being prepared/)).toBeHidden({ timeout: 60_000 });
@@ -130,6 +147,16 @@ test("recruiter to candidate to report", async ({ page, browser }) => {
   await page.goto("/interviews");
   await page.getByRole("link", { name: "Taylor Morgan" }).click();
   await expect(page.getByText("Report ready")).toBeVisible({ timeout: 90_000 });
+  // The identity check: the reference photo is shown (and served only to signed-in recruiters).
+  const identity = page.getByRole("region", { name: "Identity check" });
+  await expect(identity).toBeVisible();
+  // The empty frames were flagged, with a photo and a link to that moment in the video.
+  await expect(identity.getByText("Needs review")).toBeVisible();
+  await expect(identity.getByText("No face in view").first()).toBeVisible();
+  const photo = identity.getByRole("img", { name: "Reference photo" });
+  await expect(photo).toBeVisible();
+  expect((await page.request.get((await photo.getAttribute("src"))!)).headers()["content-type"]).toBe("image/jpeg");
+  if (process.env.E2E_SCREENSHOTS) await identity.screenshot({ path: "test-results/identity-check.png" });
   await page.getByRole("tab", { name: "Report" }).click();
   await expect(page.getByText("Candidate interview report")).toBeVisible();
   await expect(page.getByText(/not a hiring recommendation/)).toBeVisible();

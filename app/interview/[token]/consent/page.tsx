@@ -11,7 +11,7 @@ export default async function ConsentPage(props: PageProps<"/interview/[token]/c
   if (step === "completed" || step === "session") redirect(`/interview/${token}/${step}`);
   return (
     <CandidateShell brand={data.brand} job={data.job_title} step={1}>
-      <ConsentScreen token={token} company={data.company_name} version={data.consent_version} minutes={data.total_minutes} />
+      <ConsentScreen token={token} company={data.company_name} version={data.consent_version} minutes={data.total_minutes} faceVerification={data.face_verification} />
     </CandidateShell>
   );
 }

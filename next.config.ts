@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      // Face model files (several MB) are fixed per release of the face library.
+      { source: "/models/face/:file*", headers: [{ key: "Cache-Control", value: "public, max-age=2592000" }] },
       // Candidate links carry a secret token: never leak it via Referer or cache it.
       { source: "/interview/:token*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }, { key: "Cache-Control", value: "no-store" }] },
     ];

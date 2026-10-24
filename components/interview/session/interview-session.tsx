@@ -11,6 +11,7 @@ import { type Brand, brandStyle } from "@/lib/branding";
 import { formatClock } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { InterviewRecorder, type UploadStatus } from "./recorder";
+import { useFaceMonitor } from "./face-monitor";
 import { BrowserVoice, fetchCredentials, RealtimeVoice, type VoiceCallbacks, type VoiceEngine } from "./voice";
 
 type Utterance = { question_id: string | null; text: string; kind: "question" | "followup" | "closing" };
@@ -117,6 +118,8 @@ export function InterviewSession({ token, company, job, interviewerName, demoMod
   const logEvent = useCallback((type: string, payload?: Record<string, string | number | boolean | null>) => {
     events.current.push({ event_id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type, payload });
   }, []);
+
+  useFaceMonitor({ token, active: stage === "live", video, onEvent: logEvent });
 
   // Flush client events periodically (best effort).
   useEffect(() => {

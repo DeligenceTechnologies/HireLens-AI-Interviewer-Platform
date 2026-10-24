@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { TagInput } from "@/components/common/tag-input";
 import { api, ClientApiError } from "@/lib/client/api";
@@ -24,6 +25,7 @@ export type JobFormValue = {
   responsibilities: string[];
   rounds: RoundValue[];
   status: "draft" | "active" | "paused" | "closed";
+  face_verification: boolean;
 };
 
 const selectClass = "h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -45,7 +47,7 @@ export function JobForm({ initial, jobId, templates }: { initial?: JobFormValue;
   const [v, setV] = useState<JobFormValue>(initial ?? {
     title: "", description: "", location: "", employment_type: "full_time", experience_min: null, experience_max: null,
     required_skills: [], preferred_skills: [], responsibilities: [],
-    rounds: [{ key: newRoundKey(), name: "Screening", kind: "ai", template_id: templates.find((t) => t.is_default)?.id ?? templates[0]?.id ?? "", criteria: [], guide: "" }], status: "active",
+    rounds: [{ key: newRoundKey(), name: "Screening", kind: "ai", template_id: templates.find((t) => t.is_default)?.id ?? templates[0]?.id ?? "", criteria: [], guide: "" }], status: "active", face_verification: true,
   });
   const [respText, setRespText] = useState((initial?.responsibilities ?? []).join("\n"));
   const [busy, setBusy] = useState(false);
@@ -136,6 +138,15 @@ export function JobForm({ initial, jobId, templates }: { initial?: JobFormValue;
             <option value="draft">Draft</option><option value="active">Active</option><option value="paused">Paused</option><option value="closed">Closed</option>
           </select>
         </div>
+      </Section>
+      <Section title="Identity check" description="Confirm the person interviewing is the same person throughout. The candidate's photo is taken at the setup check and compared with their face during the AI interview.">
+        <label className="flex items-start gap-3 text-sm">
+          <Switch checked={v.face_verification} onCheckedChange={(c) => set("face_verification", c)} className="mt-0.5" aria-describedby="face-help" />
+          <span>
+            <span className="font-medium">Face verification</span>
+            <span id="face-help" className="mt-0.5 block text-muted-foreground">Flags a different face, another person in view, or the candidate leaving the frame, with photos for your team to review. Candidates are told and give consent first. It never ends or rejects an interview.</span>
+          </span>
+        </label>
       </Section>
       <div className="flex justify-end gap-2 pt-2">
         <Button type="button" variant="outline" onClick={() => router.back()} disabled={busy}>Cancel</Button>

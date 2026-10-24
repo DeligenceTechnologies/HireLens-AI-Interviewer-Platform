@@ -31,8 +31,11 @@ import {
 } from "@/types/interview";
 import { advanceState, canTransition, computeAllowed, resolveNextStep, stripThanks, totalPlannedMs } from "./state-machine";
 import { processInterview } from "./processing";
+import { hasFaceReference } from "./face";
 
 export const CONSENT_VERSION = "2026-09-v1";
+/** Consent text that also covers the identity (face) check. */
+export const FACE_CONSENT_VERSION = "2026-10-face-v1";
 
 type InterviewCtx = {
   id: string;
@@ -48,6 +51,8 @@ type InterviewCtx = {
   jobTitle: string;
   companyName: string;
   interviewerName: string;
+  /** Whether this interview checks the candidate's face against a reference selfie. */
+  faceVerification: boolean;
 };
 
 const ACTIVE: InterviewStatus[] = ["in_progress", "completing"];
@@ -59,10 +64,11 @@ export async function resolveToken(token: string): Promise<InterviewCtx> {
   const [row] = await withSystem((tx) => tx<{
     id: string; organization_id: string; status: InterviewStatus; plan_status: string; interview_plan: unknown; state: unknown;
     started_at: Date | null; consent_given: boolean; token_expires_at: Date | null; candidate_name: string; job_title: string;
-    org_name: string; settings: unknown; org_status: string;
+    org_name: string; settings: unknown; org_status: string; face_verification: boolean; consent_version: string | null;
   }[]>`
-    select i.id, i.organization_id, i.status, i.plan_status, i.interview_plan, i.state, i.started_at, i.consent_given, i.token_expires_at,
-      c.name as candidate_name, j.title as job_title, o.name as org_name, o.settings, o.status as org_status
+    select i.id, i.organization_id, i.status, i.plan_status, i.interview_plan, i.state, i.started_at, i.consent_given, i.consent_version, i.token_expires_at,
+      c.name as candidate_name, j.title as job_title, o.name as org_name, o.settings, o.status as org_status,
+      case when i.started_at is null then j.face_verification else i.face_verification end as face_verification
     from interviews i join candidates c on c.id = i.candidate_id join jobs j on j.id = i.job_id join organizations o on o.id = i.organization_id
     where i.secure_token_hash = ${hashToken(token)}`);
   if (!row) throw new ApiError(404, "This interview link is invalid or has been replaced by a newer link.");
@@ -82,12 +88,14 @@ export async function resolveToken(token: string): Promise<InterviewCtx> {
     plan: plan?.success ? plan.data : null,
     state: state.success ? state.data : initialInterviewState(),
     startedAt: row.started_at,
-    consentGiven: row.consent_given,
+    // Identity check needs consent to the text that describes it.
+    consentGiven: row.consent_given && (!row.face_verification || row.consent_version === FACE_CONSENT_VERSION),
     tokenExpiresAt: row.token_expires_at,
     candidateName: row.candidate_name,
     jobTitle: row.job_title,
     companyName: row.org_name,
     interviewerName: readSettings(row.settings).interviewer_name,
+    faceVerification: row.face_verification,
   };
 }
 
@@ -112,7 +120,8 @@ export async function getPublicInterview(token: string) {
     company_name: ctx.companyName,
     interviewer_name: ctx.interviewerName,
     consent_given: ctx.consentGiven,
-    consent_version: CONSENT_VERSION,
+    consent_version: ctx.faceVerification ? FACE_CONSENT_VERSION : CONSENT_VERSION,
+    face_verification: ctx.faceVerification,
     plan_ready: ctx.planStatus === "completed" && !!ctx.plan,
     plan_failed: ctx.planStatus === "failed",
     total_minutes: ctx.plan ? Math.round(totalPlannedMs(ctx.plan) / 60_000) : null,
@@ -130,13 +139,14 @@ async function setStatus(tx: Tx, ctx: { id: string; status: InterviewStatus }, t
 
 export async function giveConsent(token: string, input: { consent: boolean; version: string }) {
   if (!input.consent) throw new ApiError(400, "Consent is required to continue.");
-  if (input.version !== CONSENT_VERSION) throw new ApiError(409, "The consent text has been updated. Please reload the page.");
   const ctx = await resolveToken(token);
+  const expected = ctx.faceVerification ? FACE_CONSENT_VERSION : CONSENT_VERSION;
+  if (input.version !== expected) throw new ApiError(409, "The consent text has been updated. Please reload the page.");
   if (ACTIVE.includes(ctx.status) || FINISHED.includes(ctx.status)) return { status: ctx.status };
   await withOrg(ctx.orgId, async (tx) => {
-    await tx`update interviews set consent_given = true, consent_timestamp = now(), consent_version = ${CONSENT_VERSION} where id = ${ctx.id}`;
+    await tx`update interviews set consent_given = true, consent_timestamp = now(), consent_version = ${expected} where id = ${ctx.id}`;
     if (["created", "invited", "consent_pending"].includes(ctx.status)) await setStatus(tx, ctx, "device_check");
-    await audit(tx, { orgId: ctx.orgId, actorType: "candidate", action: "interview.consent_given", entityType: "interview", entityId: ctx.id, metadata: { version: CONSENT_VERSION } });
+    await audit(tx, { orgId: ctx.orgId, actorType: "candidate", action: "interview.consent_given", entityType: "interview", entityId: ctx.id, metadata: { version: expected } });
   });
   return { status: "device_check" as const };
 }
@@ -145,6 +155,7 @@ export async function completeDeviceCheck(token: string, result: { camera: boole
   const ctx = await resolveToken(token);
   if (!ctx.consentGiven) throw new ApiError(409, "Please give consent first.");
   if (!result.camera || !result.microphone) throw new ApiError(400, "A working camera and microphone are required.");
+  if (ctx.faceVerification && !(await hasFaceReference(ctx))) throw new ApiError(400, "Please take your photo for the identity check first.");
   if (["device_check", "invited", "consent_pending", "created"].includes(ctx.status)) {
     await withOrg(ctx.orgId, async (tx) => {
       if (ctx.status !== "device_check") await setStatus(tx, ctx, "device_check");

@@ -12,6 +12,7 @@ export type AuditAction =
   | "job.apply_link_changed" | "application.received" | "application.screened" | "application.status_changed" | "application.interview_invited"
   | "template.created" | "template.updated" | "template.deleted"
   | "interview.created" | "interview.invited" | "interview.reminded" | "interview.cancelled" | "interview.plan_generated"
+  | "interview.face_reference_saved"
   | "interview.consent_given" | "interview.started" | "interview.question_asked" | "interview.answer_received"
   | "interview.followup_generated" | "interview.section_completed" | "interview.completed"
   | "interview.evaluation_generated" | "interview.report_generated" | "interview.report_viewed"

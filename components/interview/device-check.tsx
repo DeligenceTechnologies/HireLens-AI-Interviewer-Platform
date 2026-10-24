@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Camera, CheckCircle2, Clapperboard, Globe, Loader2, Mic, Volume2, Wifi, XCircle } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, Clapperboard, Globe, Loader2, Mic, ScanFace, Volume2, Wifi, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/client/api";
 import { isWirelessMic, recordingProblem } from "@/components/interview/session/recording-health";
+import { loadFaceModel, scanFaces, snapshot, uploadFace } from "@/lib/client/face";
 
 type Status = "pending" | "ok" | "fail" | "warn";
 
@@ -20,7 +21,10 @@ function Row({ icon: Icon, label, status, detail, action }: { icon: typeof Camer
   );
 }
 
-export function DeviceCheck({ token, planReady }: { token: string; planReady: boolean }) {
+type FaceState = "loading" | "searching" | "many" | "far" | "captured" | "unavailable";
+type FaceReference = { descriptor: number[] | null; image: Blob; url: string };
+
+export function DeviceCheck({ token, planReady, faceVerification }: { token: string; planReady: boolean; faceVerification: boolean }) {
   const router = useRouter();
   const video = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -36,6 +40,9 @@ export function DeviceCheck({ token, planReady }: { token: string; planReady: bo
   const heardVoice = useRef(false);
   const [micName, setMicName] = useState("");
   const [recTest, setRecTest] = useState<Status>("pending");
+  const [faceState, setFaceState] = useState<FaceState>("loading");
+  const [faceRef, setFaceRef] = useState<FaceReference | null>(null);
+  const [retake, setRetake] = useState(0);
 
   useEffect(() => {
     const supported = typeof window !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined" && typeof RTCPeerConnection !== "undefined" && typeof AudioContext !== "undefined";
@@ -83,6 +90,47 @@ export function DeviceCheck({ token, planReady }: { token: string; planReady: bo
 
   useEffect(() => { if (video.current && stream) video.current.srcObject = stream; }, [stream]);
 
+  // Identity check: take the reference photo once exactly one face is clearly in view.
+  // Starts after the test recording, so loading the face model can't slow that test down.
+  const recTested = recTest !== "pending";
+  useEffect(() => {
+    if (!faceVerification || !stream || !recTested) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const capture = async (descriptor: number[] | null) => {
+      const v = video.current;
+      const image = v && await snapshot(v);
+      if (stopped || !image) return false;
+      setFaceRef({ descriptor, image, url: URL.createObjectURL(image) });
+      setFaceState(descriptor ? "captured" : "unavailable");
+      return true;
+    };
+    loadFaceModel().then((faceapi) => {
+      let steady = 0;
+      const tick = async () => {
+        if (stopped || !video.current) return;
+        try {
+          const scan = await scanFaces(faceapi, video.current);
+          if (stopped) return;
+          const clear = scan.faces === 1 && scan.descriptor && (scan.size ?? 0) >= 0.12;
+          steady = clear ? steady + 1 : 0;
+          setFaceState(scan.faces > 1 ? "many" : scan.faces === 1 && !clear ? "far" : "searching");
+          if (clear && steady >= 2 && await capture(scan.descriptor)) return;
+        } catch { /* a dropped frame: try again */ }
+        timer = setTimeout(tick, 700);
+      };
+      void tick();
+    }).catch(() => {
+      // This device can't run the face model: keep a photo for the hiring team to check by eye.
+      if (stopped) return;
+      const wait = () => { timer = setTimeout(async () => { if (!stopped && !(await capture(null))) wait(); }, 1500); };
+      wait();
+    });
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [faceVerification, stream, recTested, retake]);
+
+  useEffect(() => () => { if (faceRef) URL.revokeObjectURL(faceRef.url); }, [faceRef]);
+
   // The personalized plan is prepared in the background: re-check until it's ready.
   useEffect(() => {
     if (planReady) return;
@@ -104,7 +152,17 @@ export function DeviceCheck({ token, planReady }: { token: string; planReady: bo
     setTimeout(() => ctx.close().catch(() => {}), 1200);
   };
 
-  const ready = cam === "ok" && mic === "ok" && browser === "ok" && speaker === "ok";
+  const faceOk = !faceVerification || !!faceRef;
+  const ready = cam === "ok" && mic === "ok" && browser === "ok" && speaker === "ok" && faceOk;
+  const faceStatus: Status = !faceRef ? (faceState === "many" ? "fail" : "pending") : faceState === "unavailable" ? "warn" : "ok";
+  const faceDetail = {
+    loading: "Getting ready…",
+    searching: "Look at the camera. Your photo is taken automatically.",
+    many: "Only you should be in view.",
+    far: "Move a little closer, with your face well lit.",
+    captured: "Photo taken. It's compared with you during the interview.",
+    unavailable: "Photo taken. Automatic checks aren't supported on this device, so the hiring team will review it.",
+  }[faceState];
 
   return (
     <div className="grid gap-8 md:grid-cols-2">
@@ -130,6 +188,16 @@ export function DeviceCheck({ token, planReady }: { token: string; planReady: bo
             action={speaker !== "ok" && <div className="flex gap-1"><Button size="sm" variant="outline" onClick={playTone}>Play</Button><Button size="sm" variant="outline" onClick={() => setSpeaker("ok")}>I heard it</Button></div>} />
           <Row icon={Clapperboard} label="Recording" status={recTest}
             detail={recTest === "ok" ? "Test recording worked" : recTest === "warn" ? "Your computer struggled to record. Close other apps (especially video calls) and reload this page." : recTest === "fail" ? "Recording isn't supported in this browser" : "Making a 5-second test recording…"} />
+          {faceVerification && (
+            <Row icon={ScanFace} label="Identity photo" status={faceStatus} detail={faceDetail}
+              action={faceRef && (
+                <div className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
+                  <img src={faceRef.url} alt="Your identity photo" className="h-9 w-12 rounded object-cover -scale-x-100" />
+                  <Button size="sm" variant="outline" disabled={busy} onClick={() => { setFaceRef(null); setFaceState("loading"); setRetake((n) => n + 1); }}>Retake</Button>
+                </div>
+              )} />
+          )}
           <Row icon={Wifi} label="Connection" status={network.s} detail={network.s === "ok" ? `Connected (${network.ms} ms)` : network.s === "fail" ? "Connection problem — check your network" : "Testing…"} />
         </div>
         {isWirelessMic(micName) && (
@@ -143,6 +211,7 @@ export function DeviceCheck({ token, planReady }: { token: string; planReady: bo
           setBusy(true);
           setError(null);
           try {
+            if (faceVerification && faceRef) await uploadFace(`/api/public/interview/${token}/face/reference`, { descriptor: faceRef.descriptor }, faceRef.image);
             await api(`/api/public/interview/${token}/device-check`, { body: { camera: cam === "ok", microphone: mic === "ok", browser: navigator.userAgent } });
             stream?.getTracks().forEach((t) => t.stop());
             router.push(`/interview/${token}/session`);

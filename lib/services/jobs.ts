@@ -24,6 +24,8 @@ export const JobInputSchema = z.object({
   /** Interview rounds in order (e.g. Screening → Technical), each with its own template. */
   rounds: z.array(RoundInputSchema).min(1, "Add at least one interview round").max(MAX_ROUNDS),
   status: z.enum(["draft", "active", "paused", "closed"]).default("draft"),
+  /** Compare the candidate's face with a reference photo during AI interviews. */
+  face_verification: z.boolean().default(true),
 }).refine((j) => j.experience_min == null || j.experience_max == null || j.experience_min <= j.experience_max, {
   message: "Minimum experience cannot exceed maximum",
   path: ["experience_min"],
@@ -49,6 +51,7 @@ export type JobRow = {
   interview_template_id: string | null;
   apply_enabled: boolean;
   apply_slug: string | null;
+  face_verification: boolean;
   created_at: Date;
   updated_at: Date;
 };
@@ -78,10 +81,10 @@ export async function createJob(orgId: string, userId: string, input: JobInput) 
   const id = await withOrg(orgId, async (tx) => {
     const [row] = await tx<{ id: string }[]>`
       insert into jobs (organization_id, title, description, location, employment_type, experience_min, experience_max,
-        required_skills, preferred_skills, responsibilities, interview_template_id, status, created_by, parse_status)
+        required_skills, preferred_skills, responsibilities, interview_template_id, status, created_by, parse_status, face_verification)
       values (${orgId}, ${input.title}, ${input.description}, ${input.location}, ${input.employment_type}, ${input.experience_min},
         ${input.experience_max}, ${json(input.required_skills)}, ${json(input.preferred_skills)}, ${json(input.responsibilities)},
-        ${input.rounds.find((r) => r.kind !== "human")?.template_id ?? null}, ${input.status}, ${userId}, ${input.description ? "pending" : null})
+        ${input.rounds.find((r) => r.kind !== "human")?.template_id ?? null}, ${input.status}, ${userId}, ${input.description ? "pending" : null}, ${input.face_verification})
       returning id`;
     await saveRounds(tx, orgId, row.id, input.rounds);
     await audit(tx, { orgId, userId, action: "job.created", entityType: "job", entityId: row.id });
@@ -100,7 +103,7 @@ export async function updateJob(orgId: string, userId: string, jobId: string, in
       update jobs set title = ${input.title}, description = ${input.description}, location = ${input.location},
         employment_type = ${input.employment_type}, experience_min = ${input.experience_min}, experience_max = ${input.experience_max},
         required_skills = ${json(input.required_skills)}, preferred_skills = ${json(input.preferred_skills)},
-        responsibilities = ${json(input.responsibilities)}, status = ${input.status}
+        responsibilities = ${json(input.responsibilities)}, status = ${input.status}, face_verification = ${input.face_verification}
       where id = ${jobId} and organization_id = ${orgId}`;
     await saveRounds(tx, orgId, jobId, input.rounds);
     await audit(tx, { orgId, userId, action: "job.updated", entityType: "job", entityId: jobId });

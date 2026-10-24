@@ -19,7 +19,7 @@ export default async function EditJobPage(props: PageProps<"/jobs/[jobId]/edit">
       <JobForm jobId={job.id} templates={templates} initial={{
         title: job.title, description: job.description, location: job.location, employment_type: job.employment_type,
         experience_min: job.experience_min, experience_max: job.experience_max, required_skills: job.required_skills,
-        preferred_skills: job.preferred_skills, responsibilities: job.responsibilities, status: job.status,
+        preferred_skills: job.preferred_skills, responsibilities: job.responsibilities, status: job.status, face_verification: job.face_verification,
         rounds: rounds.length
           ? rounds.map((r) => ({ id: r.id, key: r.id, name: r.name, kind: r.kind, template_id: r.template_id ?? "", criteria: r.criteria, guide: r.guide ?? "" }))
           : [{ key: "first", name: "Screening", kind: "ai" as const, template_id: templates.find((t) => t.is_default)?.id ?? templates[0]?.id ?? "", criteria: [], guide: "" }],
