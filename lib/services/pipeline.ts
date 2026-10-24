@@ -57,6 +57,10 @@ export function roundResults(rounds: PipelineRound[], entries: RoundEntry[]): Ro
 
 export const allQualified = (results: RoundResult[]) => results.length > 0 && results.every((r) => r.decision === "qualified");
 
+/** Identifies the set of round decisions an overall summary is built from (changes when any is redone). */
+export const summaryFingerprint = (results: RoundResult[]) =>
+  results.map((r) => `${r.round.id}:${r.entry?.id ?? "-"}:${r.entry?.decided_at?.toISOString() ?? "-"}`).join("|");
+
 export type CandidatePipeline = {
   job_id: string; job_title: string; job_status: string; stage: Stage; stage_note: string | null; stage_changed_at: Date | null; stage_by: string | null;
   results: RoundResult[]; extras: RoundEntry[]; entries: RoundEntry[]; allQualified: boolean;
@@ -112,7 +116,7 @@ export async function getJobPipeline(orgId: string, jobId: string) {
 export async function setRoundDecision(orgId: string, userId: string, input: { kind: "ai" | "human"; id: string; decision: Decision | null; note?: string | null }) {
   const note = input.decision ? input.note?.trim() || null : null;
   const reason = input.decision ? null : input.note?.trim() || null;
-  await withOrg(orgId, async (tx) => {
+  return withOrg(orgId, async (tx) => {
     const [before] = input.kind === "ai"
       ? await tx<{ decision: Decision | null }[]>`select decision from interviews where id = ${input.id} and organization_id = ${orgId} for update`
       : await tx<{ decision: Decision | null }[]>`select decision from human_interviews where id = ${input.id} and organization_id = ${orgId} for update`;
@@ -137,6 +141,7 @@ export async function setRoundDecision(orgId: string, userId: string, input: { k
       orgId, userId, action: "interview.decision", entityType: input.kind === "ai" ? "interview" : "human_interview", entityId: input.id,
       metadata: { decision: input.decision, previous: before.decision, ...(note ? { note: note.slice(0, 300) } : {}), ...(reason ? { reason: reason.slice(0, 300) } : {}) },
     });
+    return { jobId: row.job_id, candidateId: row.candidate_id };
   });
 }
 

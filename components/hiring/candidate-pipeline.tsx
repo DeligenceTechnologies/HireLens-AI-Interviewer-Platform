@@ -7,6 +7,7 @@ import type { CandidatePipeline, RoundEntry } from "@/lib/services/pipeline";
 import { DecisionBadge, StageBadge } from "./badges";
 import { ScheduleButton, type PanelMember } from "./schedule-dialog";
 import { StageControl } from "./stage-control";
+import { OverallSummaryCard, type SummaryState } from "./overall-summary-card";
 
 const href = (e: RoundEntry) => (e.kind === "human" ? `/interviews/human/${e.id}` : `/interviews/${e.id}`);
 const when = (e: RoundEntry) => (e.kind === "human" && e.at && e.timezone ? formatInZone(e.at, e.timezone) : formatDate(e.at ?? e.created_at));
@@ -23,8 +24,10 @@ function EntryLine({ e }: { e: RoundEntry }) {
 }
 
 /** A candidate's progress in each job: round by round, then the overall outcome. */
-export function CandidatePipelines({ pipelines, candidateId, candidateName, canDecide, canSchedule, members, emailLive }: {
+export function CandidatePipelines({ pipelines, candidateId, candidateName, canDecide, canSchedule, members, emailLive, summaries = {} }: {
   pipelines: CandidatePipeline[]; candidateId: string; candidateName: string; canDecide: boolean; canSchedule: boolean; members: PanelMember[]; emailLive: boolean;
+  /** Overall result per job, for candidates who cleared every round. */
+  summaries?: Record<string, SummaryState>;
 }) {
   if (!pipelines.length) return null;
   return (
@@ -76,6 +79,9 @@ export function CandidatePipelines({ pipelines, candidateId, candidateName, canD
               <ScheduleButton label="Schedule extra interview" members={members} emailLive={emailLive}
                 mode={{ kind: "create", jobId: p.job_id, candidateId, candidateName, roundName: "Extra interview" }} />
             </div>
+          )}
+          {p.allQualified && summaries[p.job_id] && (
+            <OverallSummaryCard state={summaries[p.job_id]} jobId={p.job_id} candidateId={candidateId} canRetry={canDecide} />
           )}
           {canDecide && (
             <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/30 px-5 py-3">

@@ -21,6 +21,7 @@ import { CandidatePipelines } from "@/components/hiring/candidate-pipeline";
 import { env } from "@/lib/env";
 import { listPanelCandidates } from "@/lib/services/human-interviews";
 import { getCandidatePipelines } from "@/lib/services/pipeline";
+import { summariesForPipelines } from "@/lib/services/candidate-summary";
 
 export default async function CandidatePage(props: PageProps<"/candidates/[candidateId]">) {
   const auth = await requireAuth("candidate:view");
@@ -34,11 +35,13 @@ export default async function CandidatePage(props: PageProps<"/candidates/[candi
     getCandidatePipelines(auth.orgId, candidateId),
     canSchedule ? listPanelCandidates(auth.orgId) : Promise.resolve([]),
   ]);
+  const summaryRows = await summariesForPipelines(auth.orgId, candidateId, pipelines);
+  const summaries = Object.fromEntries([...summaryRows].map(([jobId, r]) => [jobId, { status: r.status, summary: r.summary, source: "source" in r ? r.source : null }]));
   const parsing = c.parse_status === "pending" || c.parse_status === "processing";
   const canWrite = can(auth.role, "candidate:write");
   return (
     <>
-      <AutoRefresh active={parsing} />
+      <AutoRefresh active={parsing || [...summaryRows.values()].some((r) => r.status === "processing")} />
       <PageHeader
         back={{ href: "/candidates", label: "Candidates" }}
         title={c.name}
@@ -56,7 +59,7 @@ export default async function CandidatePage(props: PageProps<"/candidates/[candi
         <div className="mb-6 space-y-3">
           <h2 className="font-semibold">Hiring progress</h2>
           <CandidatePipelines pipelines={pipelines} candidateId={c.id} candidateName={c.name} canDecide={can(auth.role, "decision:write")} canSchedule={canSchedule}
-            members={members.map((m) => ({ user_id: m.user_id, name: m.name, role: m.role }))} emailLive={env().EMAIL_PROVIDER !== "log"} />
+            members={members.map((m) => ({ user_id: m.user_id, name: m.name, role: m.role }))} emailLive={env().EMAIL_PROVIDER !== "log"} summaries={summaries} />
         </div>
       )}
       <div className="grid gap-6 lg:grid-cols-3">

@@ -116,6 +116,12 @@ test("round decisions, human interview and shortlist", async ({ page }) => {
   // Back on the profile: every round qualified, shortlist.
   await page.goto(`/candidates/${candidateId}`);
   await expect(progress.getByText("Every round is marked Qualified. Ready to shortlist.")).toBeVisible();
+  // The overall result appears once every round is Qualified (built in the background).
+  const overall = progress.getByRole("region", { name: "Overall result" });
+  await expect(overall).toBeVisible({ timeout: 30_000 });
+  await expect(overall.getByText(/2 of 2 rounds Qualified/)).toBeVisible();
+  await expect(overall.getByText(/1 of 1 interviewer recommends/)).toBeVisible();
+  if (process.env.E2E_SCREENSHOTS) await overall.screenshot({ path: "test-results/hiring-overall-result.png" });
   await progress.getByRole("button", { name: "Shortlist" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Shortlist" }).click();
   await expect(progress.getByText("Shortlisted", { exact: true })).toBeVisible();

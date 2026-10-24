@@ -174,6 +174,10 @@ test("recruiter to candidate to report", async ({ page, browser }) => {
   const tail = await page.request.get(rec.parts[0].url, { headers: { Range: `bytes=${total - 10}-` } });
   expect(tail.status()).toBe(206);
   expect((await tail.body()).length).toBe(10);
+  // Evidence links can open the recording at a moment (?t= in milliseconds).
+  await page.goto(`/interviews/${interviewId}/recording?t=5000`);
+  await expect.poll(() => page.evaluate(() => document.querySelector("video")?.currentTime ?? 0), { timeout: 20_000 }).toBeGreaterThanOrEqual(4.5);
+  await page.goto(`/interviews/${interviewId}`);
   await page.getByRole("tab", { name: "Transcript" }).click();
   await expect(page.getByText(LONG_ANSWER.slice(0, 40)).first()).toBeVisible();
   await page.getByRole("tab", { name: "Questions" }).click();

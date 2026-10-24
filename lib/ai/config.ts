@@ -15,6 +15,7 @@ export const AI_CONFIG = {
   answerTurn: { model: FAST, reasoningEffort: "none", verbosity: "low" } as const,
   evaluator: REASONING,
   reportGenerator: REASONING,
+  overallSummary: REASONING,
   applicationScreener: REASONING,
   realtime: process.env.OPENAI_MODEL_REALTIME || "gpt-realtime-2.1",
   transcription: process.env.OPENAI_MODEL_TRANSCRIBE || "gpt-live-transcribe",
@@ -37,4 +38,5 @@ export type AIFeature =
   | "section_evaluator"
   | "report_generator"
   | "application_screener"
+  | "overall_summary"
   | "realtime_session";

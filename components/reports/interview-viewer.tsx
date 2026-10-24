@@ -107,6 +107,19 @@ export function InterviewViewer({ detail, initialTab, showScores, canViewRecordi
     }
   }, [segments, detail.id]);
 
+  // Links such as /interviews/{id}/recording?t=754000 open the video at that moment.
+  const startAt = useRef<number | null>(null);
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("t");
+    if (t && /^\d+$/.test(t)) startAt.current = Number(t);
+  }, []);
+  useEffect(() => {
+    if (!parts?.length || startAt.current == null) return;
+    const ms = startAt.current;
+    startAt.current = null;
+    requestAnimationFrame(() => jump(ms));
+  }, [parts, jump]);
+
   const totalMs = useMemo(() => {
     const segEnd = segments?.length ? segments[segments.length - 1].end_time_ms : 0;
     return Math.max((detail.duration_seconds ?? 0) * 1000, segEnd, ...detail.sections.map((s) => s.end_ms ?? 0));

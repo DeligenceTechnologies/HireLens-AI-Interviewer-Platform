@@ -192,3 +192,13 @@ export const AnswerTurnSchema = AnswerAnalysisSchema.extend({
   transition: z.string().nullable(),
 });
 export type AnswerTurn = z.infer<typeof AnswerTurnSchema>;
+
+/** Overall summary across every round a candidate cleared (to support the shortlist decision). */
+export const OverallSummarySchema = z.object({
+  summary: z.string(),
+  highlights: z.array(z.object({ point: z.string(), source_ids: z.array(z.string()) })),
+  concern: z.object({ point: z.string(), source_ids: z.array(z.string()) }).nullable(),
+  interviewer_quote: z.object({ quote: z.string(), source_id: z.string() }).nullable(),
+  requirements: z.array(z.object({ requirement: z.string(), evidenced: z.boolean(), source_ids: z.array(z.string()) })),
+});
+export type OverallSummary = z.infer<typeof OverallSummarySchema>;
